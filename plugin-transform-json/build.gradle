@@ -13,5 +13,5 @@ jar {
 }
 
 dependencies {
-    implementation 'com.ibm.jsonata4java:JSONata4Java:2.5.0'
+    implementation 'com.ibm.jsonata4java:JSONata4Java:2.5.1'
 }
