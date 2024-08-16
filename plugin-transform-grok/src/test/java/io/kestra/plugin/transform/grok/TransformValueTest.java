@@ -130,4 +130,48 @@ class TransformValueTest {
             output.getValue()
         );
     }
+
+    @Test
+    public void shouldTransformGivenKeepEmptyCapturesTrue() throws Exception {
+        // Given
+        RunContext runContext = runContextFactory.of();
+        TransformValue task = TransformValue.builder()
+            .patterns(List.of("%{IP:client_ip}(?:\\s+%{WORD:method})? %{NOTSPACE:url}"))
+            .namedCapturesOnly(true)
+            .breakOnFirstMatch(true)
+            .keepEmptyCaptures(true)
+            .from("192.168.1.1 /index.html")
+            .build();
+
+        // When
+        TransformValue.Output output = task.run(runContext);
+
+        // Then
+        Assertions.assertEquals(
+            Map.of("method", "", "client_ip", "192.168.1.1", "url", "/index.html"),
+            output.getValue()
+        );
+    }
+
+    @Test
+    public void shouldTransformGivenKeepEmptyCapturesFalse() throws Exception {
+        // Given
+        RunContext runContext = runContextFactory.of();
+        TransformValue task = TransformValue.builder()
+            .patterns(List.of("%{IP:client_ip}(?:\\s+%{WORD:method})? %{NOTSPACE:url}"))
+            .namedCapturesOnly(true)
+            .breakOnFirstMatch(true)
+            .keepEmptyCaptures(false)
+            .from("192.168.1.1 /index.html")
+            .build();
+
+        // When
+        TransformValue.Output output = task.run(runContext);
+
+        // Then
+        Assertions.assertEquals(
+            Map.of("client_ip", "192.168.1.1", "url", "/index.html"),
+            output.getValue()
+        );
+    }
 }
