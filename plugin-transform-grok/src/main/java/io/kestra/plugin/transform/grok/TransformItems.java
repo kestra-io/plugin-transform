@@ -20,7 +20,12 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 
-import java.io.InputStream;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.Writer;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -95,16 +100,15 @@ public class TransformItems extends Transform implements GrokInterface, Runnable
         String from = runContext.render(this.from);
 
         URI objectURI = new URI(from);
-        try (InputStream is = runContext.storage().getFile(objectURI);) {
-            Flux<String> flux = FileSerde.readAll(is, new TypeReference<String>() {
+        try (Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(objectURI)), FileSerde.BUFFER_SIZE)) {
+            Flux<String> flux = FileSerde.readAll(reader, new TypeReference<>() {
             });
             final Path ouputFilePath = runContext.workingDir().createTempFile(".ion");
-            try {
+            try(Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(ouputFilePath)))) {
+
                 // transform
                 Flux<Map<String, Object>> values = flux.map(data -> matches(data.getBytes(StandardCharsets.UTF_8)));
-
-                Long processedItemsTotal = FileSerde.writeAll(Files.newOutputStream(ouputFilePath), values).block();
-
+                Long processedItemsTotal = FileSerde.writeAll(writer, values).block();
                 URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 
                 // output
