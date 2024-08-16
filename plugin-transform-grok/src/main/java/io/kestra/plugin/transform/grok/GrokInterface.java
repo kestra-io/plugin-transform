@@ -41,4 +41,11 @@ public interface GrokInterface {
         description = "The first successful match by grok will result in the task being finished. Set to `false` if you want the task to try all configured patterns."
     )
     boolean isBreakOnFirstMatch();
+
+    @PluginProperty
+    @Schema(
+        title = "If `true`, keep empty captures.",
+        description = "When an optional field cannot be captured, the empty field is retained in the output. Set `false` if you want empty optional fields to be filtered out."
+    )
+    boolean isKeepEmptyCaptures();
 }

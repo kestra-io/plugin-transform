@@ -44,6 +44,9 @@ public abstract class Transform extends Task {
     @Builder.Default
     private boolean breakOnFirstMatch = true;
 
+    @Builder.Default
+    private boolean keepEmptyCaptures = false;
+
     @Getter(AccessLevel.PRIVATE)
     private GrokPatternCompiler compiler;
 
@@ -79,7 +82,18 @@ public abstract class Transform extends Task {
         // merge all named captured
         Map<String, Object> mergedValues = new HashMap<>();
         for (Map<String, Object> namedCaptured : allNamedCaptured) {
-            mergedValues.putAll(namedCaptured);
+            if (keepEmptyCaptures) {
+                mergedValues.putAll(namedCaptured);
+            } else {
+                Map<String, Object> filtered = namedCaptured.entrySet()
+                    .stream()
+                    .filter(entry -> {
+                        Object value = entry.getValue();
+                        return value != null && (!(value instanceof String str) || !str.isEmpty());
+                    })
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                mergedValues.putAll(filtered);
+            }
         }
         return mergedValues;
     }

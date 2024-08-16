@@ -38,6 +38,8 @@ public record GrokCaptureGroup(
 
     private record RawValueExtractor(int[] backRefs, Consumer<String> consumer) implements GrokCaptureExtractor {
 
+        private static final String EMPTY_VALUE = "";
+
         /**
          * {@inheritDoc}
          */
@@ -50,6 +52,8 @@ public record GrokCaptureGroup(
                     String value = new String(bytes, offset, length, StandardCharsets.UTF_8);
                     consumer.accept(value);
                     break; // we only need to capture the first value.
+                } else {
+                    consumer.accept(EMPTY_VALUE);
                 }
             }
         }
