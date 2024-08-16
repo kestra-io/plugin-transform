@@ -13,7 +13,10 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,11 +33,11 @@ class TransformItemsTest {
         // Given
         RunContext runContext = runContextFactory.of();
         final Path ouputFilePath = runContext.workingDir().createTempFile(".ion");
-        try (final OutputStream os = Files.newOutputStream(ouputFilePath)) {
-            FileSerde.writeAll(os, Flux.just(
+        try (final Writer writer = new OutputStreamWriter(Files.newOutputStream(ouputFilePath))) {
+            FileSerde.writeAll(writer, Flux.just(
                 new ObjectMapper().readValue(Features.DATASET_ACCOUNT_ORDER_JSON, Map.class),
                 new ObjectMapper().readValue(Features.DATASET_ACCOUNT_ORDER_JSON, Map.class))).block();
-            os.flush();
+            writer.flush();
         }
         URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 
@@ -51,7 +54,7 @@ class TransformItemsTest {
         Assertions.assertEquals(2, output.getProcessedItemsTotal());
 
         InputStream is = runContext.storage().getFile(output.getUri());
-        String transformationResult = FileSerde.readAll(is, new TypeReference<String>() {
+        String transformationResult = FileSerde.readAll(new InputStreamReader(is), new TypeReference<String>() {
         }).blockLast();
 
         Assertions.assertEquals(Features.DATASET_ACCOUNT_ORDER_EXPR_RESULT, transformationResult);

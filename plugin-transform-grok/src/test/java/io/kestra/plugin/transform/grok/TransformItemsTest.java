@@ -11,7 +11,10 @@ import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,7 +33,7 @@ class TransformItemsTest {
         RunContext runContext = runContextFactory.of();
 
         final Path ouputFilePath = runContext.workingDir().createTempFile(".ion");
-        try (final OutputStream os = Files.newOutputStream(ouputFilePath)) {
+        try (final Writer os = new OutputStreamWriter(Files.newOutputStream(ouputFilePath))) {
             FileSerde.writeAll(os, Flux.just("1 unittest@kestra.io", "2 admin@kestra.io", "3 no-reply@kestra.io")).block();
             os.flush();
         }
@@ -52,7 +55,7 @@ class TransformItemsTest {
         Assertions.assertEquals(3, output.getProcessedItemsTotal());
 
         InputStream is = runContext.storage().getFile(output.getUri());
-        List<Map> items = FileSerde.readAll(is, new TypeReference<Map>() {}).collectList().block();
+        List<Map> items = FileSerde.readAll(new InputStreamReader(is), new TypeReference<Map>() {}).collectList().block();
         Assertions.assertEquals(3, items.size());
 
         Assertions.assertEquals(

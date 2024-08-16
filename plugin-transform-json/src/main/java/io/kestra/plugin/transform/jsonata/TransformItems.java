@@ -1,6 +1,11 @@
 package io.kestra.plugin.transform.jsonata;
 
-import java.io.InputStream;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.Writer;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -98,16 +103,16 @@ public class TransformItems extends Transform implements RunnableTask<Output> {
 
         final URI from = new URI(runContext.render(this.from));
 
-        try (InputStream is = runContext.storage().getFile(from)) {
-            Flux<JsonNode> flux = FileSerde.readAll(is, new TypeReference<JsonNode>() {
+        try (Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE)) {
+            Flux<JsonNode> flux = FileSerde.readAll(reader, new TypeReference<>() {
             });
             final Path ouputFilePath = runContext.workingDir().createTempFile(".ion");
-            try {
+            try(Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(ouputFilePath)))) {
 
                 // transform
                 Flux<JsonNode> values = flux.map(this::evaluateExpression);
 
-                Long processedItemsTotal = FileSerde.writeAll(Files.newOutputStream(ouputFilePath), values).block();
+                Long processedItemsTotal = FileSerde.writeAll(writer, values).block();
 
                 URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 
