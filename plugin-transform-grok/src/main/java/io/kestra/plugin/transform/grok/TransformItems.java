@@ -50,30 +50,30 @@ import java.util.Map;
     examples = {
         @Example(
             title = "Consume, parse, and structure logs events from Kafka topic.",
-            full = false,
+            full = true,
             code = """
-                id: grok
-                namespace: myteam
+                id: grok_transform_items
+                namespace: company.team
 
                 tasks:
-                - id: grok
-                  type: io.kestra.plugin.transform.grok.TransformItems
-                  pattern: "%{TIMESTAMP_ISO8601:logdate} %{LOGLEVEL:loglevel} %{GREEDYDATA:message}"
-                  from: "{{ trigger.uri }}"
-                          
+                  - id: transform_items
+                    type: io.kestra.plugin.transform.grok.TransformItems
+                    pattern: "%{TIMESTAMP_ISO8601:logdate} %{LOGLEVEL:loglevel} %{GREEDYDATA:message}"
+                    from: "{{ trigger.uri }}"
+                            
                 triggers:
-                - id: trigger
-                  type: io.kestra.plugin.kafka.Trigger
-                  topic: test_kestra
-                  properties:
-                    bootstrap.servers: localhost:9092
-                  serdeProperties:
-                    schema.registry.url: http://localhost:8085
-                    keyDeserializer: STRING
-                    valueDeserializer: STRING
-                  groupId: kafkaConsumerGroupId
-                  interval: PT30S
-                  maxRecords: 5
+                  - id: trigger
+                    type: io.kestra.plugin.kafka.Trigger
+                    topic: test_kestra
+                    properties:
+                      bootstrap.servers: localhost:9092
+                    serdeProperties:
+                      schema.registry.url: http://localhost:8085
+                      keyDeserializer: STRING
+                      valueDeserializer: STRING
+                    groupId: kafkaConsumerGroupId
+                    interval: PT30S
+                    maxRecords: 5
                 """
         )
     }
