@@ -40,34 +40,34 @@ import java.util.Map;
             title = "Consume, parse, and structure logs events from Kafka topic.",
             full = true,
             code = """
-                id: grok
-                namespace: myteam
+                id: grok_transform_value
+                namespace: company.team
 
                 tasks:
-                - id: grok
-                  type: io.kestra.plugin.transform.grok.TransformValue
-                  pattern: "%{TIMESTAMP_ISO8601:logdate} %{LOGLEVEL:loglevel} %{GREEDYDATA:message}"
-                  from: "{{ trigger.value }}"
-                  
-                - id: log_on_warn
-                  type: io.kestra.plugin.core.flow.If
-                  condition: "{{ grok.value['LOGLEVEL'] == 'ERROR' }}"
-                  then:
-                    - id: when_true
-                      type: io.kestra.plugin.core.log.Log
-                      message: "{{ outputs.grok.value }}"
+                  - id: transform_value
+                    type: io.kestra.plugin.transform.grok.TransformValue
+                    pattern: "%{TIMESTAMP_ISO8601:logdate} %{LOGLEVEL:loglevel} %{GREEDYDATA:message}"
+                    from: "{{ trigger.value }}"
+                    
+                  - id: log_on_warn
+                    type: io.kestra.plugin.core.flow.If
+                    condition: "{{ grok.value['LOGLEVEL'] == 'ERROR' }}"
+                    then:
+                      - id: when_true
+                        type: io.kestra.plugin.core.log.Log
+                        message: "{{ outputs.transform_value.value }}"
                           
                 triggers:
-                - id: realtime_trigger
-                  type: io.kestra.plugin.kafka.RealtimeTrigger
-                  topic: test_kestra
-                  properties:
-                    bootstrap.servers: localhost:9092
-                  serdeProperties:
-                    schema.registry.url: http://localhost:8085
-                    keyDeserializer: STRING
-                    valueDeserializer: STRING
-                  groupId: kafkaConsumerGroupId   
+                  - id: realtime_trigger
+                    type: io.kestra.plugin.kafka.RealtimeTrigger
+                    topic: test_kestra
+                    properties:
+                      bootstrap.servers: localhost:9092
+                    serdeProperties:
+                      schema.registry.url: http://localhost:8085
+                      keyDeserializer: STRING
+                      valueDeserializer: STRING
+                    groupId: kafkaConsumerGroupId   
                 """
         )
     }

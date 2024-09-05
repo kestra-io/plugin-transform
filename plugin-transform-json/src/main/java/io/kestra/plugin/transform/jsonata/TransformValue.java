@@ -34,10 +34,11 @@ import lombok.experimental.SuperBuilder;
             title = "Transform JSON data using JSONata expression",
             full = true,
             code = """
-                id: jsonata
+                id: jsonata_transform_value
                 namespace: company.team
+
                 tasks:
-                  - id: transformJson
+                  - id: transform_json
                     type: io.kestra.plugin.transform.jsonata.TransformValue
                     from: |
                       {
@@ -70,12 +71,12 @@ import lombok.experimental.SuperBuilder;
                         ]
                       }
                     expression: |
-                       {
-                         "order_id": order_id,
-                         "customer_name": first_name & ' ' & last_name,
-                         "address": address.city & ', ' & address.country,
-                         "total_price": $sum(items.(quantity * price_per_unit))
-                       }
+                      {
+                        "order_id": order_id,
+                        "customer_name": first_name & ' ' & last_name,
+                        "address": address.city & ', ' & address.country,
+                        "total_price": $sum(items.(quantity * price_per_unit))
+                      }
                 """
         )
     }

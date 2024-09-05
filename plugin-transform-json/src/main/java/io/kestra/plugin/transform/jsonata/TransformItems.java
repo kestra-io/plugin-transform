@@ -47,26 +47,31 @@ import reactor.core.publisher.Flux;
             title = "Transform JSON payload using JSONata expression.",
             full = true,
             code = """
-                id: jsonata-example
+                id: jsonata_example
                 namespace: company.team
+
                 tasks:
                   - id: http_download
                     type: io.kestra.plugin.core.http.Download
                     uri: https://dummyjson.com/products
+                  
                   - id: get_product_and_brand_name
                     description: "String Transformation"
                     type: io.kestra.plugin.transform.jsonata.TransformItems
                     from: "{{ outputs.http_download.uri }}"
                     expression: products.(title & ' by ' & brand)
+                  
                   - id: get_total_price
                     description: "Number Transformation"
                     type: io.kestra.plugin.transform.jsonata.TransformItems
                     from: "{{ outputs.http_download.uri }}"
                     expression: $sum(products.price)
+                  
                   - id: get_discounted_price
                     type: io.kestra.plugin.transform.jsonata.TransformItems
                     from: "{{ outputs.http_download.uri }}"
                     expression: $sum(products.(price-(price*discountPercentage/100)))
+                  
                   - id: sum_up
                     description: "Writing out results in the form of JSON"
                     type: io.kestra.plugin.transform.jsonata.TransformItems
