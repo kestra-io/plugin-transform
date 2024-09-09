@@ -9,6 +9,8 @@ import java.io.Writer;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Iterator;
+import java.util.stream.StreamSupport;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -31,6 +33,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @SuperBuilder
 @ToString
@@ -54,29 +57,29 @@ import reactor.core.publisher.Flux;
                   - id: http_download
                     type: io.kestra.plugin.core.http.Download
                     uri: https://dummyjson.com/products
-                  
+
                   - id: get_product_and_brand_name
                     description: "String Transformation"
                     type: io.kestra.plugin.transform.jsonata.TransformItems
                     from: "{{ outputs.http_download.uri }}"
                     expression: products.(title & ' by ' & brand)
-                  
+
                   - id: get_total_price
                     description: "Number Transformation"
                     type: io.kestra.plugin.transform.jsonata.TransformItems
                     from: "{{ outputs.http_download.uri }}"
                     expression: $sum(products.price)
-                  
+
                   - id: get_discounted_price
                     type: io.kestra.plugin.transform.jsonata.TransformItems
                     from: "{{ outputs.http_download.uri }}"
                     expression: $sum(products.(price-(price*discountPercentage/100)))
-                  
+
                   - id: sum_up
                     description: "Writing out results in the form of JSON"
                     type: io.kestra.plugin.transform.jsonata.TransformItems
                     from: "{{ outputs.http_download.uri }}"
-                    expression: | 
+                    expression: |
                       {
                         "total_products": $count(products),
                         "total_price": $sum(products.price),
@@ -98,6 +101,15 @@ public class TransformItems extends Transform implements RunnableTask<Output> {
     @NotNull
     private String from;
 
+    @Schema(
+        title = "Specifies whether to explode arrays into separate records.",
+        description = "If the JSONata expression results in a JSON array and this property is set to `true`, then a record will be written for each element. Otherwise, the JSON array is kept as a single record."
+    )
+    @PluginProperty(dynamic = true)
+    @NotNull
+    @Builder.Default
+    private boolean explodeArray = true;
+
     /**
      * {@inheritDoc}
      **/
@@ -116,6 +128,16 @@ public class TransformItems extends Transform implements RunnableTask<Output> {
 
                 // transform
                 Flux<JsonNode> values = flux.map(this::evaluateExpression);
+
+                if (explodeArray) {
+                    values = values.flatMap(jsonNode -> {
+                        if (jsonNode.isArray()) {
+                            Iterable<JsonNode> iterable = jsonNode::elements;
+                            return Flux.fromStream(StreamSupport.stream(iterable.spliterator(), false));
+                        }
+                        return Mono.just(jsonNode);
+                    });
+                }
 
                 Long processedItemsTotal = FileSerde.writeAll(writer, values).block();
 
