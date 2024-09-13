@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.tasks.Output;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
@@ -81,7 +80,7 @@ import lombok.experimental.SuperBuilder;
         )
     }
 )
-public class TransformValue extends Transform implements RunnableTask<Output> {
+public class TransformValue extends Transform<TransformValue.Output> implements RunnableTask<TransformValue.Output> {
 
     public static final ObjectMapper JSON_OBJECT_MAPPER = JacksonMapper.ofJson();
 

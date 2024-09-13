@@ -28,7 +28,7 @@ import java.util.Optional;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-public abstract class Transform extends Task implements JSONataInterface, RunnableTask<Output> {
+public abstract class Transform<T extends Output> extends Task implements JSONataInterface, RunnableTask<T> {
 
     private static final ObjectMapper ION_OBJECT_MAPPER = JacksonMapper.ofIon();
 

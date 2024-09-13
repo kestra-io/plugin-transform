@@ -9,7 +9,6 @@ import java.io.Writer;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Iterator;
 import java.util.stream.StreamSupport;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -19,7 +18,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.tasks.Output;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
@@ -89,7 +87,7 @@ import reactor.core.publisher.Mono;
         )
     }
 )
-public class TransformItems extends Transform implements RunnableTask<Output> {
+public class TransformItems extends Transform<TransformItems.Output> implements RunnableTask<TransformItems.Output> {
 
     private static final ObjectMapper ION_OBJECT_MAPPER = JacksonMapper.ofIon();
 
