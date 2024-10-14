@@ -79,6 +79,28 @@ import reactor.core.publisher.Mono;
                         "total_discounted_price": $sum(products.(price-(price*discountPercentage/100)))
                       }
                 """
+        ),
+        @Example(
+            title = "Calculate the total price per order from a JSON file.",
+            full = true,
+            code = """
+                id: jsonata
+                namespace: company.team
+
+                tasks:
+                  - id: extract
+                    type: io.kestra.plugin.core.http.Download
+                    uri: https://huggingface.co/datasets/kestra/datasets/resolve/main/json/orders.json
+                
+                  - id: jsonata
+                    type: io.kestra.plugin.transform.jsonata.TransformItems
+                    from: "{{ outputs.extract.uri }}"
+                    expression: |
+                      Account.Order.{
+                        "order_id": OrderID,
+                        "total": $round($sum(Product.(Price * Quantity)), 2)
+                      }
+                """
         )
     }
 )
