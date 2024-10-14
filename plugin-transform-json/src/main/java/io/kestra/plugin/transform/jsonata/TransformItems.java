@@ -39,13 +39,13 @@ import reactor.core.publisher.Mono;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Transform or query a JSON data using JSONata language.",
-    description = "[JSONata](https://jsonata.org/) is a sophisticated query and transformation language for JSON data."
+    title = "Transform or query a JSON data using JSONata.",
+    description = "[JSONata](https://jsonata.org/) is a query and transformation language for JSON data."
 )
 @Plugin(
     examples = {
         @Example(
-            title = "Transform JSON payload using JSONata expression.",
+            title = "Transform a JSON file using a JSONata expression.",
             full = true,
             code = """
                 id: jsonata_example
@@ -67,11 +67,6 @@ import reactor.core.publisher.Mono;
                     type: io.kestra.plugin.transform.jsonata.TransformItems
                     from: "{{ outputs.http_download.uri }}"
                     expression: $sum(products.price)
-
-                  - id: get_discounted_price
-                    type: io.kestra.plugin.transform.jsonata.TransformItems
-                    from: "{{ outputs.http_download.uri }}"
-                    expression: $sum(products.(price-(price*discountPercentage/100)))
 
                   - id: sum_up
                     description: "Writing out results in the form of JSON"

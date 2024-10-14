@@ -24,13 +24,13 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Transform or query a JSON data using JSONata language.",
-    description = "[JSONata](https://jsonata.org/) is a sophisticated query and transformation language for JSON data."
+    title = "Transform or query a JSON data using JSONata.",
+    description = "[JSONata](https://jsonata.org/) is a query and transformation language for JSON data."
 )
 @Plugin(
     examples = {
         @Example(
-            title = "Transform JSON data using JSONata expression",
+            title = "Transform JSON data using a JSONata expression",
             full = true,
             code = """
                 id: jsonata_transform_value
