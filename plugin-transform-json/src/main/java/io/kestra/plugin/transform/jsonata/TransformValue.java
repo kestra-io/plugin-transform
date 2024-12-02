@@ -47,7 +47,7 @@ import lombok.experimental.SuperBuilder;
                         "address": {
                           "city": "Paris",
                           "country": "France"
-                        }, 
+                        },
                         "items": [
                           {
                             "product_id": "001",
@@ -103,7 +103,7 @@ public class TransformValue extends Transform<TransformValue.Output> implements 
         final JsonNode from = parseJson(runContext.render(this.from));
 
         // transform
-        JsonNode transformed = evaluateExpression(from);
+        JsonNode transformed = evaluateExpression(runContext, from);
 
         // output
         return Output.builder().value(transformed).build();

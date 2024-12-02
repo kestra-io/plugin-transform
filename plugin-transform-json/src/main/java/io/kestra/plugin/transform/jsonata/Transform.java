@@ -44,11 +44,14 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
         this.expressions = parseExpression(runContext);
     }
 
-    protected JsonNode evaluateExpression(JsonNode jsonNode) {
+    protected JsonNode evaluateExpression(RunContext runContext, JsonNode jsonNode) {
         try {
-            long timeoutInMilli = Optional.ofNullable(getTimeout()).map(Duration::toMillis).orElse(Long.MAX_VALUE);
+            long timeoutInMilli = runContext.render(getTimeout()).as(Duration.class)
+                .map(Duration::toMillis)
+                .orElse(Long.MAX_VALUE);
+
             return this.expressions.evaluate(jsonNode, timeoutInMilli, getMaxDepth());
-        } catch (EvaluateException e) {
+        } catch (EvaluateException | IllegalVariableEvaluationException e) {
             throw new RuntimeException("Failed to evaluate expression", e);
         }
     }
