@@ -125,7 +125,7 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
             try(Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(ouputFilePath)))) {
 
                 // transform
-                Flux<JsonNode> values = flux.map(this::evaluateExpression);
+                Flux<JsonNode> values = flux.map(node -> this.evaluateExpression(runContext, node));
 
                 if (explodeArray) {
                     values = values.flatMap(jsonNode -> {
