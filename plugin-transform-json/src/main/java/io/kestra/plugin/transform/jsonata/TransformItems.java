@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
@@ -91,7 +92,7 @@ import reactor.core.publisher.Mono;
                   - id: extract
                     type: io.kestra.plugin.core.http.Download
                     uri: https://huggingface.co/datasets/kestra/datasets/resolve/main/json/orders.json
-                
+
                   - id: jsonata
                     type: io.kestra.plugin.transform.jsonata.TransformItems
                     from: "{{ outputs.extract.uri }}"
@@ -112,18 +113,16 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
         title = "The file to be transformed.",
         description = "Must be a `kestra://` internal storage URI."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    private String from;
+    private Property<String> from;
 
     @Schema(
         title = "Specifies whether to explode arrays into separate records.",
         description = "If the JSONata expression results in a JSON array and this property is set to `true`, then a record will be written for each element. Otherwise, the JSON array is kept as a single record."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
     @Builder.Default
-    private boolean explodeArray = true;
+    private Property<Boolean> explodeArray = Property.of(true);
 
     /**
      * {@inheritDoc}
@@ -133,7 +132,7 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
 
         init(runContext);
 
-        final URI from = new URI(runContext.render(this.from));
+        final URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
         try (Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE)) {
             Flux<JsonNode> flux = FileSerde.readAll(reader, new TypeReference<>() {
@@ -144,7 +143,7 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
                 // transform
                 Flux<JsonNode> values = flux.map(node -> this.evaluateExpression(runContext, node));
 
-                if (explodeArray) {
+                if (runContext.render(explodeArray).as(Boolean.class).orElseThrow()) {
                     values = values.flatMap(jsonNode -> {
                         if (jsonNode.isArray()) {
                             Iterable<JsonNode> iterable = jsonNode::elements;

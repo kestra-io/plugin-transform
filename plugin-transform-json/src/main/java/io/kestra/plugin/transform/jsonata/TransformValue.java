@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
@@ -88,9 +89,8 @@ public class TransformValue extends Transform<TransformValue.Output> implements 
         title = "The value to be transformed.",
         description = "Must be a valid JSON string."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    private String from;
+    private Property<String> from;
 
 
     /**
@@ -100,7 +100,7 @@ public class TransformValue extends Transform<TransformValue.Output> implements 
     public Output run(RunContext runContext) throws Exception {
         init(runContext);
 
-        final JsonNode from = parseJson(runContext.render(this.from));
+        final JsonNode from = parseJson(runContext.render(this.from).as(String.class).orElseThrow());
 
         // transform
         JsonNode transformed = evaluateExpression(runContext, from);

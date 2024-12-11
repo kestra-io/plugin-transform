@@ -6,6 +6,7 @@ import com.api.jsonata4java.expressions.ParseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Output;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
@@ -32,10 +33,10 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
 
     private static final ObjectMapper ION_OBJECT_MAPPER = JacksonMapper.ofIon();
 
-    private String expression;
+    private Property<String> expression;
 
     @Builder.Default
-    private Integer maxDepth = 1000;
+    private Property<Integer> maxDepth = Property.of(1000);
 
     @Getter(AccessLevel.PRIVATE)
     private Expressions expressions;
@@ -50,7 +51,7 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
                 .map(Duration::toMillis)
                 .orElse(Long.MAX_VALUE);
 
-            return this.expressions.evaluate(jsonNode, timeoutInMilli, getMaxDepth());
+            return this.expressions.evaluate(jsonNode, timeoutInMilli, runContext.render(getMaxDepth()).as(Integer.class).orElseThrow());
         } catch (EvaluateException | IllegalVariableEvaluationException e) {
             throw new RuntimeException("Failed to evaluate expression", e);
         }
@@ -58,7 +59,7 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
 
     private Expressions parseExpression(RunContext runContext) throws IllegalVariableEvaluationException {
         try {
-            return Expressions.parse(runContext.render(this.expression));
+            return Expressions.parse(runContext.render(this.expression).as(String.class).orElseThrow());
         } catch (ParseException | IOException e) {
             throw new IllegalArgumentException("Invalid JSONata expression. Error: " + e.getMessage(), e);
         }
