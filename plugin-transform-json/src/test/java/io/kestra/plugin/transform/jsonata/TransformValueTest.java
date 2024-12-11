@@ -1,6 +1,7 @@
 package io.kestra.plugin.transform.jsonata;
 
 import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import jakarta.inject.Inject;
@@ -18,8 +19,8 @@ class TransformValueTest {
         // Given
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
-            .from(Features.DATASET_ACCOUNT_ORDER_JSON)
-            .expression(Features.DATASET_ACCOUNT_ORDER_EXPR)
+            .from(Property.of(Features.DATASET_ACCOUNT_ORDER_JSON))
+            .expression(Property.of(Features.DATASET_ACCOUNT_ORDER_EXPR))
             .build();
 
         // When
@@ -36,7 +37,7 @@ class TransformValueTest {
         // Given
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
-            .from("""
+            .from(Property.of("""
                 {
                   "order_id": "ABC123",
                   "customer_name": "John Doe",
@@ -61,14 +62,14 @@ class TransformValueTest {
                     }
                   ]
                 }
-                """)
-            .expression("""
+                """))
+            .expression(Property.of("""
                      {
                         "order_id": order_id,
                         "customer_name": customer_name,
                         "total_price": $sum(items.(quantity * price_per_unit))
                      }
-                """)
+                """))
             .build();
 
         // When

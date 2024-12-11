@@ -2,6 +2,7 @@ package io.kestra.plugin.transform.grok;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
@@ -40,11 +41,11 @@ class TransformItemsTest {
         URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 
         TransformItems task = TransformItems.builder()
-            .patterns(List.of("%{INT}", "%{EMAILADDRESS}"))
-            .namedCapturesOnly(false)
-            .from(uri.toString())
-            .patternsDir(List.of("./custom-patterns"))
-            .breakOnFirstMatch(false)
+            .patterns(Property.of(List.of("%{INT}", "%{EMAILADDRESS}")))
+            .namedCapturesOnly(Property.of(false))
+            .from(Property.of(uri.toString()))
+            .patternsDir(Property.of(List.of("./custom-patterns")))
+            .breakOnFirstMatch(Property.of(false))
             .build();
 
         // When

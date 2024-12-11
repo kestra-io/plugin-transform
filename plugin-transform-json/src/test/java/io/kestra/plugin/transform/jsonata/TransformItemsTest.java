@@ -3,6 +3,7 @@ package io.kestra.plugin.transform.jsonata;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
@@ -43,8 +44,8 @@ class TransformItemsTest {
         URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 
         TransformItems task = TransformItems.builder()
-            .from(uri.toString())
-            .expression(Features.DATASET_ACCOUNT_ORDER_EXPR)
+            .from(Property.of(uri.toString()))
+            .expression(Property.of(Features.DATASET_ACCOUNT_ORDER_EXPR))
             .build();
 
         // When
@@ -73,9 +74,9 @@ class TransformItemsTest {
         URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 
         TransformItems task = TransformItems.builder()
-            .from(uri.toString())
-            .expression("Account.Order.Product")
-            .explodeArray(true)
+            .from(Property.of(uri.toString()))
+            .expression(Property.of("Account.Order.Product"))
+            .explodeArray(Property.of(true))
             .build();
 
         // When
@@ -104,9 +105,9 @@ class TransformItemsTest {
         URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 
         TransformItems task = TransformItems.builder()
-            .from(uri.toString())
-            .expression("Account.Order.Product")
-            .explodeArray(false)
+            .from(Property.of(uri.toString()))
+            .expression(Property.of("Account.Order.Product"))
+            .explodeArray(Property.of(false))
             .build();
 
         // When

@@ -2,9 +2,10 @@ package io.kestra.plugin.transform.grok;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Output;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
@@ -42,7 +43,7 @@ import java.util.Map;
     description = """
         The `TransformItems` task is similar to the famous Logstash Grok filter from the ELK stack.
         It is particularly useful for transforming unstructured data such as logs into a structured, indexable, and queryable data structure.
-                
+
         The `TransformItems` ships with all the default patterns as defined You can find them here: https://github.com/kestra-io/plugin-transform/tree/main/plugin-transform-grok/src/main/resources/patterns.
         """
 )
@@ -60,7 +61,7 @@ import java.util.Map;
                     type: io.kestra.plugin.transform.grok.TransformItems
                     pattern: "%{TIMESTAMP_ISO8601:logdate} %{LOGLEVEL:loglevel} %{GREEDYDATA:message}"
                     from: "{{ trigger.uri }}"
-                            
+
                 triggers:
                   - id: trigger
                     type: io.kestra.plugin.kafka.Trigger
@@ -86,9 +87,8 @@ public class TransformItems extends Transform implements GrokInterface, Runnable
         title = "The file to be transformed.",
         description = "Must be a `kestra://` internal storage URI."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    private String from;
+    private Property<String> from;
 
     /**
      * {@inheritDoc}
@@ -97,7 +97,7 @@ public class TransformItems extends Transform implements GrokInterface, Runnable
     public Output run(RunContext runContext) throws Exception {
         init(runContext);
 
-        String from = runContext.render(this.from);
+        String from = runContext.render(this.from).as(String.class).orElseThrow();
 
         URI objectURI = new URI(from);
         try (Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(objectURI)), FileSerde.BUFFER_SIZE)) {
@@ -107,7 +107,13 @@ public class TransformItems extends Transform implements GrokInterface, Runnable
             try(Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(ouputFilePath)))) {
 
                 // transform
-                Flux<Map<String, Object>> values = flux.map(data -> matches(data.getBytes(StandardCharsets.UTF_8)));
+                Flux<Map<String, Object>> values = flux.map(data -> {
+                    try {
+                        return matches(data.getBytes(StandardCharsets.UTF_8), runContext);
+                    } catch (IllegalVariableEvaluationException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
                 Long processedItemsTotal = FileSerde.writeAll(writer, values).block();
                 URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 

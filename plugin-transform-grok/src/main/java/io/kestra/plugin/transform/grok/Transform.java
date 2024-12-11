@@ -1,5 +1,7 @@
 package io.kestra.plugin.transform.grok;
 
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.transform.grok.pattern.GrokMatcher;
@@ -30,22 +32,22 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 public abstract class Transform extends Task {
 
-    private String pattern;
+    private Property<String> pattern;
 
-    private List<String> patterns;
+    private Property<List<String>> patterns;
 
-    private List<String> patternsDir;
+    private Property<List<String>> patternsDir;
 
-    private Map<String, String> patternDefinitions;
-
-    @Builder.Default
-    private boolean namedCapturesOnly = true;
+    private Property<Map<String, String>> patternDefinitions;
 
     @Builder.Default
-    private boolean breakOnFirstMatch = true;
+    private Property<Boolean> namedCapturesOnly = Property.of(true);
 
     @Builder.Default
-    private boolean keepEmptyCaptures = false;
+    private Property<Boolean> breakOnFirstMatch = Property.of(true);
+
+    @Builder.Default
+    private Property<Boolean> keepEmptyCaptures = Property.of(false);
 
     @Getter(AccessLevel.PRIVATE)
     private GrokPatternCompiler compiler;
@@ -53,36 +55,36 @@ public abstract class Transform extends Task {
     @Getter(AccessLevel.PRIVATE)
     private List<GrokMatcher> grokMatchers;
 
-    public void init(final RunContext runContext) {
+    public void init(final RunContext runContext) throws IllegalVariableEvaluationException {
 
         // create compiler
         this.compiler = new GrokPatternCompiler(
             new GrokPatternResolver(
                 runContext.logger(),
-                patternDefinitions(),
+                patternDefinitions(runContext),
                 patternsDir(runContext)
             ),
-            isNamedCapturesOnly()
+            runContext.render(getNamedCapturesOnly()).as(Boolean.class).orElseThrow()
         );
 
         // compile all patterns
-        this.grokMatchers = patterns().stream().map(compiler::compile).toList();
+        this.grokMatchers = patterns(runContext).stream().map(compiler::compile).toList();
     }
 
-    public Map<String, Object> matches(final byte[] bytes) {
+    public Map<String, Object> matches(final byte[] bytes, RunContext runContext) throws IllegalVariableEvaluationException {
         // match patterns
         final List<Map<String, Object>> allNamedCaptured = new ArrayList<>(grokMatchers.size());
         for (GrokMatcher matcher : grokMatchers) {
             final Map<String, Object> captured = matcher.captures(bytes);
             if (captured != null) {
                 allNamedCaptured.add(captured);
-                if (isBreakOnFirstMatch()) break;
+                if (runContext.render(getBreakOnFirstMatch()).as(Boolean.class).orElseThrow()) break;
             }
         }
         // merge all named captured
         Map<String, Object> mergedValues = new HashMap<>();
         for (Map<String, Object> namedCaptured : allNamedCaptured) {
-            if (keepEmptyCaptures) {
+            if (runContext.render(getKeepEmptyCaptures()).as(Boolean.class).orElseThrow()) {
                 mergedValues.putAll(namedCaptured);
             } else {
                 Map<String, Object> filtered = namedCaptured.entrySet()
@@ -98,27 +100,29 @@ public abstract class Transform extends Task {
         return mergedValues;
     }
 
-    private Map<String, String> patternDefinitions() {
-        return Optional.ofNullable(patternDefinitions).orElse(Collections.emptyMap());
+    private Map<String, String> patternDefinitions(RunContext runContext) throws IllegalVariableEvaluationException {
+        return runContext.render(patternDefinitions).asMap(String.class, String.class);
     }
 
-    private List<File> patternsDir(RunContext runContext) {
-        if (this.patternsDir == null || this.patternsDir.isEmpty()) return Collections.emptyList();
+    private List<File> patternsDir(RunContext runContext) throws IllegalVariableEvaluationException {
+        var renderedPatternsDir = runContext.render(this.patternsDir).asList(String.class);
+        if (renderedPatternsDir.isEmpty()) return Collections.emptyList();
 
-        return this.patternsDir
+        return renderedPatternsDir
             .stream()
             .map(dir -> runContext.workingDir().resolve(Path.of(dir)))
             .map(Path::toFile)
             .collect(Collectors.toList());
     }
 
-    private List<String> patterns() {
-        if (pattern != null) return List.of(pattern);
+    private List<String> patterns(RunContext runContext) throws IllegalVariableEvaluationException {
+        if (pattern != null) return List.of(runContext.render(pattern).as(String.class).orElseThrow());
 
-        if (patterns == null || patterns.isEmpty()) {
+        var patternsList = runContext.render(patterns).asList(String.class);
+        if (patternsList.isEmpty()) {
             throw new IllegalArgumentException(
                 "Missing required configuration, either `pattern` or `patterns` properties must not be empty.");
         }
-        return patterns;
+        return patternsList;
     }
 }
