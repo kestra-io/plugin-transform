@@ -1,6 +1,7 @@
 package io.kestra.plugin.transform.grok;
 
 import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import jakarta.inject.Inject;
@@ -33,10 +34,10 @@ class TransformValueTest {
             .putFile(Path.of("custom-patterns/email"), new ByteArrayInputStream(customPattern.getBytes(StandardCharsets.UTF_8)));
 
         TransformValue task = TransformValue.builder()
-            .pattern("%{EMAIL}")
-            .namedCapturesOnly(false)
-            .from("unit-test@kestra.io")
-            .patternsDir(List.of("./custom-patterns"))
+            .pattern(Property.of("%{EMAIL}"))
+            .namedCapturesOnly(Property.of(false))
+            .from(Property.of("unit-test@kestra.io"))
+            .patternsDir(Property.of(List.of("./custom-patterns")))
             .build();
 
         // When
@@ -54,9 +55,9 @@ class TransformValueTest {
         // Given
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
-            .patterns(List.of("%{EMAILADDRESS}"))
-            .namedCapturesOnly(false)
-            .from("unit-test@kestra.io")
+            .patterns(Property.of(List.of("%{EMAILADDRESS}")))
+            .namedCapturesOnly(Property.of(false))
+            .from(Property.of("unit-test@kestra.io"))
             .build();
 
         // When
@@ -74,9 +75,9 @@ class TransformValueTest {
         // Given
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
-            .patterns(List.of("%{EMAILADDRESS:email}"))
-            .namedCapturesOnly(true)
-            .from("unit-test@kestra.io")
+            .patterns(Property.of(List.of("%{EMAILADDRESS:email}")))
+            .namedCapturesOnly(Property.of(true))
+            .from(Property.of("unit-test@kestra.io"))
             .build();
 
         // When
@@ -94,10 +95,10 @@ class TransformValueTest {
         // Given
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
-            .patterns(List.of("%{NUMBER}", "%{EMAILADDRESS}"))
-            .namedCapturesOnly(false)
-            .breakOnFirstMatch(false)
-            .from("42 unit-test@kestra.io")
+            .patterns(Property.of(List.of("%{NUMBER}", "%{EMAILADDRESS}")))
+            .namedCapturesOnly(Property.of(false))
+            .breakOnFirstMatch(Property.of(false))
+            .from(Property.of("42 unit-test@kestra.io"))
             .build();
 
         // When
@@ -115,10 +116,10 @@ class TransformValueTest {
         // Given
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
-            .patterns(List.of("%{NUMBER}", "%{EMAILADDRESS}"))
-            .namedCapturesOnly(false)
-            .breakOnFirstMatch(true)
-            .from("unit-test@kestra.io")
+            .patterns(Property.of(List.of("%{NUMBER}", "%{EMAILADDRESS}")))
+            .namedCapturesOnly(Property.of(false))
+            .breakOnFirstMatch(Property.of(true))
+            .from(Property.of("unit-test@kestra.io"))
             .build();
 
         // When
@@ -136,11 +137,11 @@ class TransformValueTest {
         // Given
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
-            .patterns(List.of("%{IP:client_ip}(?:\\s+%{WORD:method})? %{NOTSPACE:url}"))
-            .namedCapturesOnly(true)
-            .breakOnFirstMatch(true)
-            .keepEmptyCaptures(true)
-            .from("192.168.1.1 /index.html")
+            .patterns(Property.of(List.of("%{IP:client_ip}(?:\\s+%{WORD:method})? %{NOTSPACE:url}")))
+            .namedCapturesOnly(Property.of(true))
+            .breakOnFirstMatch(Property.of(true))
+            .keepEmptyCaptures(Property.of(true))
+            .from(Property.of("192.168.1.1 /index.html"))
             .build();
 
         // When
@@ -158,11 +159,11 @@ class TransformValueTest {
         // Given
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
-            .patterns(List.of("%{IP:client_ip}(?:\\s+%{WORD:method})? %{NOTSPACE:url}"))
-            .namedCapturesOnly(true)
-            .breakOnFirstMatch(true)
-            .keepEmptyCaptures(false)
-            .from("192.168.1.1 /index.html")
+            .patterns(Property.of(List.of("%{IP:client_ip}(?:\\s+%{WORD:method})? %{NOTSPACE:url}")))
+            .namedCapturesOnly(Property.of(true))
+            .breakOnFirstMatch(Property.of(true))
+            .keepEmptyCaptures(Property.of(false))
+            .from(Property.of("192.168.1.1 /index.html"))
             .build();
 
         // When

@@ -3,7 +3,7 @@ package io.kestra.plugin.transform.grok;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Output;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
@@ -30,7 +30,7 @@ import java.util.Map;
     description = """
         The `TransformValue` task is similar to the famous Logstash Grok filter from the ELK stack.
         It is particularly useful for transforming unstructured data such as logs into a structured, indexable, and queryable data structure.
-        
+
         The `TransformValue` ships with all the default patterns as defined You can find them here: https://github.com/kestra-io/plugin-transform/tree/main/plugin-transform-grok/src/main/resources/patterns.
         """
 )
@@ -48,7 +48,7 @@ import java.util.Map;
                     type: io.kestra.plugin.transform.grok.TransformValue
                     pattern: "%{TIMESTAMP_ISO8601:logdate} %{LOGLEVEL:loglevel} %{GREEDYDATA:message}"
                     from: "{{ trigger.value }}"
-                    
+
                   - id: log_on_warn
                     type: io.kestra.plugin.core.flow.If
                     condition: "{{ grok.value['LOGLEVEL'] == 'ERROR' }}"
@@ -56,7 +56,7 @@ import java.util.Map;
                       - id: when_true
                         type: io.kestra.plugin.core.log.Log
                         message: "{{ outputs.transform_value.value }}"
-                          
+
                 triggers:
                   - id: realtime_trigger
                     type: io.kestra.plugin.kafka.RealtimeTrigger
@@ -67,7 +67,7 @@ import java.util.Map;
                       schema.registry.url: http://localhost:8085
                       keyDeserializer: STRING
                       valueDeserializer: STRING
-                    groupId: kafkaConsumerGroupId   
+                    groupId: kafkaConsumerGroupId
                 """
         )
     }
@@ -77,9 +77,8 @@ public class TransformValue extends Transform implements GrokInterface, Runnable
     private static final ObjectMapper ION_OBJECT_MAPPER = JacksonMapper.ofIon();
 
     @Schema(title = "The value to parse.")
-    @PluginProperty(dynamic = true)
     @NotNull
-    private String from;
+    private Property<String> from;
 
     /**
      * {@inheritDoc}
@@ -88,10 +87,10 @@ public class TransformValue extends Transform implements GrokInterface, Runnable
     public Output run(RunContext runContext) throws Exception {
         init(runContext);
 
-        String from = runContext.render(this.from);
+        String from = runContext.render(this.from).as(String.class).orElseThrow();
 
         // transform
-        Map<String, Object> values = matches(from.getBytes(StandardCharsets.UTF_8));
+        Map<String, Object> values = matches(from.getBytes(StandardCharsets.UTF_8), runContext);
 
         // output
         return Output.builder().value(values).build();
