@@ -13,5 +13,5 @@ jar {
 }
 
 dependencies {
-    implementation 'org.jruby.joni:joni:2.2.3'
+    implementation 'org.jruby.joni:joni:2.2.5'
 }
