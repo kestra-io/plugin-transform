@@ -114,6 +114,7 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
         description = "Must be a `kestra://` internal storage URI."
     )
     @NotNull
+    @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
     @Schema(
