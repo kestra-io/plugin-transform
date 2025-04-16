@@ -26,7 +26,7 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Parse arbitrary text and structure it using Grok expressions.",
+    title = "Parse and structure raw JSON string using Grok expressions.",
     description = """
         The `TransformValue` task is similar to the famous Logstash Grok filter from the ELK stack.
         It is particularly useful for transforming unstructured data such as logs into a structured, indexable, and queryable data structure.
