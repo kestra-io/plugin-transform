@@ -19,8 +19,8 @@ class TransformValueTest {
         // Given
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
-            .from(Property.of(Features.DATASET_ACCOUNT_ORDER_JSON))
-            .expression(Property.of(Features.DATASET_ACCOUNT_ORDER_EXPR))
+            .from(Property.ofValue(Features.DATASET_ACCOUNT_ORDER_JSON))
+            .expression(Property.ofValue(Features.DATASET_ACCOUNT_ORDER_EXPR))
             .build();
 
         // When
@@ -37,7 +37,7 @@ class TransformValueTest {
         // Given
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
-            .from(Property.of("""
+            .from(Property.ofValue("""
                 {
                   "order_id": "ABC123",
                   "customer_name": "John Doe",
@@ -63,7 +63,7 @@ class TransformValueTest {
                   ]
                 }
                 """))
-            .expression(Property.of("""
+            .expression(Property.ofValue("""
                      {
                         "order_id": order_id,
                         "customer_name": customer_name,
