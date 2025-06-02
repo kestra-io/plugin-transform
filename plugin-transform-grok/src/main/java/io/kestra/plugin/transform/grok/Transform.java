@@ -41,13 +41,13 @@ public abstract class Transform extends Task {
     private Property<Map<String, String>> patternDefinitions;
 
     @Builder.Default
-    private Property<Boolean> namedCapturesOnly = Property.of(true);
+    private Property<Boolean> namedCapturesOnly = Property.ofValue(true);
 
     @Builder.Default
-    private Property<Boolean> breakOnFirstMatch = Property.of(true);
+    private Property<Boolean> breakOnFirstMatch = Property.ofValue(true);
 
     @Builder.Default
-    private Property<Boolean> keepEmptyCaptures = Property.of(false);
+    private Property<Boolean> keepEmptyCaptures = Property.ofValue(false);
 
     @Getter(AccessLevel.PRIVATE)
     private GrokPatternCompiler compiler;
