@@ -44,8 +44,8 @@ class TransformItemsTest {
         URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 
         TransformItems task = TransformItems.builder()
-            .from(Property.of(uri.toString()))
-            .expression(Property.of(Features.DATASET_ACCOUNT_ORDER_EXPR))
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue(Features.DATASET_ACCOUNT_ORDER_EXPR))
             .build();
 
         // When
@@ -74,9 +74,9 @@ class TransformItemsTest {
         URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 
         TransformItems task = TransformItems.builder()
-            .from(Property.of(uri.toString()))
-            .expression(Property.of("Account.Order.Product"))
-            .explodeArray(Property.of(true))
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue("Account.Order.Product"))
+            .explodeArray(Property.ofValue(true))
             .build();
 
         // When
@@ -105,9 +105,9 @@ class TransformItemsTest {
         URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 
         TransformItems task = TransformItems.builder()
-            .from(Property.of(uri.toString()))
-            .expression(Property.of("Account.Order.Product"))
-            .explodeArray(Property.of(false))
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue("Account.Order.Product"))
+            .explodeArray(Property.ofValue(false))
             .build();
 
         // When

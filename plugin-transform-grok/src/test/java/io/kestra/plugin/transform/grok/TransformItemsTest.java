@@ -41,11 +41,11 @@ class TransformItemsTest {
         URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 
         TransformItems task = TransformItems.builder()
-            .patterns(Property.of(List.of("%{INT}", "%{EMAILADDRESS}")))
-            .namedCapturesOnly(Property.of(false))
-            .from(Property.of(uri.toString()))
-            .patternsDir(Property.of(List.of("./custom-patterns")))
-            .breakOnFirstMatch(Property.of(false))
+            .patterns(Property.ofValue(List.of("%{INT}", "%{EMAILADDRESS}")))
+            .namedCapturesOnly(Property.ofValue(false))
+            .from(Property.ofValue(uri.toString()))
+            .patternsDir(Property.ofValue(List.of("./custom-patterns")))
+            .breakOnFirstMatch(Property.ofValue(false))
             .build();
 
         // When

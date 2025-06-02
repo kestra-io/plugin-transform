@@ -36,7 +36,7 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
     private Property<String> expression;
 
     @Builder.Default
-    private Property<Integer> maxDepth = Property.of(1000);
+    private Property<Integer> maxDepth = Property.ofValue(1000);
 
     @Getter(AccessLevel.PRIVATE)
     private Expressions expressions;

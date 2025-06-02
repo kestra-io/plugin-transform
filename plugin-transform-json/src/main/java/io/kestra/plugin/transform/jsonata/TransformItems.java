@@ -123,7 +123,7 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
     )
     @NotNull
     @Builder.Default
-    private Property<Boolean> explodeArray = Property.of(true);
+    private Property<Boolean> explodeArray = Property.ofValue(true);
 
     /**
      * {@inheritDoc}
