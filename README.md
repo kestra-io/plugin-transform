@@ -33,14 +33,11 @@
 <p align="center" style="color:grey;"><i>Get started with Kestra in 4 minutes.</i></p>
 
 
-# Kestra Plugin JSON
+# Kestra Transform Plugin
 
-> A template for creating Kestra plugins
-
-This repository serves as a general template for creating a new [Kestra](https://github.com/kestra-io/kestra) plugin. It should take only a few minutes! Use this repository as a scaffold to ensure that you've set up the plugin correctly, including unit tests and CI/CD workflows.
+This repository allows you to transform data coming from a JSON for instance.
 
 ![Kestra orchestrator](https://kestra.io/video.gif)
-
 
 ## Documentation
 * Full documentation can be found under: [kestra.io/docs](https://kestra.io/docs)
