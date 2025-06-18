@@ -20,7 +20,8 @@
          id="tspan1"
          style="stroke-width:0.264583"
          x="36.908913"
-         y="116.46806">Grok </tspan></text>
+         y="116.46806"
+         fill="white">Grok </tspan></text>
         <text
                 xml:space="preserve"
                 style="font-style:normal;font-weight:normal;font-size:10.5833px;line-height:1.25;font-family:sans-serif;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
@@ -30,6 +31,7 @@
          id="tspan2"
          style="stroke-width:0.264583"
          x="64.159302"
-         y="115.74596">{}</tspan></text>
+         y="115.74596"
+         fill="white">{}</tspan></text>
     </g>
 </svg>
