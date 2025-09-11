@@ -40,7 +40,7 @@ import reactor.core.publisher.Mono;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Transform or query a JSON file using JSONata.",
+    title = "Transform or query a JSON or ION file using JSONata.",
     description = "[JSONata](https://jsonata.org/) is a query and transformation language for JSON data."
 )
 @Plugin(
@@ -110,7 +110,7 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
     private static final ObjectMapper ION_OBJECT_MAPPER = JacksonMapper.ofIon();
 
     @Schema(
-        title = "The file to be transformed.",
+        title = "The file to be transformed",
         description = "Must be a `kestra://` internal storage URI."
     )
     @NotNull
@@ -118,7 +118,7 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
     private Property<String> from;
 
     @Schema(
-        title = "Specifies whether to explode arrays into separate records.",
+        title = "Specifies whether to split arrays into separate records",
         description = "If the JSONata expression results in a JSON array and this property is set to `true`, then a record will be written for each element. Otherwise, the JSON array is kept as a single record."
     )
     @NotNull
