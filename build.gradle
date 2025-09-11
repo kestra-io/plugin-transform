@@ -66,6 +66,11 @@ subprojects {
         // Logs
         compileOnly 'org.slf4j:slf4j-api'
         compileOnly 'ch.qos.logback:logback-classic'
+
+        // Jackson
+        implementation "com.fasterxml.jackson.core:jackson-core"
+        implementation "com.fasterxml.jackson.core:jackson-databind"
+        implementation "com.fasterxml.jackson.core:jackson-annotations"
     }
 }
 

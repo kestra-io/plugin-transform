@@ -1,20 +1,7 @@
 package io.kestra.plugin.transform.jsonata;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Reader;
-import java.io.Writer;
-import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.stream.StreamSupport;
-
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -22,17 +9,18 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
-import io.kestra.core.serializers.JacksonMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.io.*;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.stream.StreamSupport;
 
 @SuperBuilder
 @ToString
@@ -107,8 +95,6 @@ import reactor.core.publisher.Mono;
 )
 public class TransformItems extends Transform<TransformItems.Output> implements RunnableTask<TransformItems.Output> {
 
-    private static final ObjectMapper ION_OBJECT_MAPPER = JacksonMapper.ofIon();
-
     @Schema(
         title = "The file to be transformed",
         description = "Must be a `kestra://` internal storage URI."
@@ -138,8 +124,8 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
         try (Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE)) {
             Flux<JsonNode> flux = FileSerde.readAll(reader, new TypeReference<>() {
             });
-            final Path ouputFilePath = runContext.workingDir().createTempFile(".ion");
-            try(Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(ouputFilePath)))) {
+            final Path outputFilePath = runContext.workingDir().createTempFile(".ion");
+            try (Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(outputFilePath)))) {
 
                 // transform
                 Flux<JsonNode> values = flux.map(node -> this.evaluateExpression(runContext, node));
@@ -156,7 +142,7 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
 
                 Long processedItemsTotal = FileSerde.writeAll(writer, values).block();
 
-                URI uri = runContext.storage().putFile(ouputFilePath.toFile());
+                URI uri = runContext.storage().putFile(outputFilePath.toFile());
 
                 // output
                 return Output
@@ -165,7 +151,7 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
                     .processedItemsTotal(processedItemsTotal)
                     .build();
             } finally {
-                Files.deleteIfExists(ouputFilePath); // ensure temp file is deleted in case of error
+                Files.deleteIfExists(outputFilePath); // ensure temp file is deleted in case of error
             }
         }
     }

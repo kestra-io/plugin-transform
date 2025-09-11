@@ -4,25 +4,17 @@ import com.api.jsonata4java.expressions.EvaluateException;
 import com.api.jsonata4java.expressions.Expressions;
 import com.api.jsonata4java.expressions.ParseException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Output;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.JacksonMapper;
-import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Optional;
 
 @SuperBuilder
 @ToString
@@ -30,8 +22,6 @@ import java.util.Optional;
 @Getter
 @NoArgsConstructor
 public abstract class Transform<T extends Output> extends Task implements JSONataInterface, RunnableTask<T> {
-
-    private static final ObjectMapper ION_OBJECT_MAPPER = JacksonMapper.ofIon();
 
     private Property<String> expression;
 

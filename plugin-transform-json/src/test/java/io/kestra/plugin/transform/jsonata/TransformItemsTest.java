@@ -11,11 +11,9 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.URI;
@@ -122,6 +120,42 @@ class TransformItemsTest {
         }).collectList().block();
 
         Assertions.assertEquals(1, transformationResult.size());
-        Assertions.assertEquals(2, transformationResult.get(0).size());
+        Assertions.assertEquals(2, transformationResult.getFirst().size());
+    }
+
+    @Test
+    void shouldTransformJsonInputWithDefaultIonMapper() throws Exception {
+        // Given
+        RunContext runContext = runContextFactory.of();
+        final Path outputFilePath = runContext.workingDir().createTempFile(".json");
+
+        try (final Writer writer = new OutputStreamWriter(Files.newOutputStream(outputFilePath))) {
+            FileSerde.writeAll(
+                writer,
+                Flux.just(Map.of("title", "ThinkPad", "brand", "Lenovo"))
+            ).block();
+            writer.flush();
+        }
+
+        URI uri = runContext.storage().putFile(outputFilePath.toFile());
+
+        TransformItems task = TransformItems.builder()
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue("title & ' by ' & brand"))
+            .build();
+
+        // When
+        TransformItems.Output output = task.run(runContext);
+
+        // Then
+        Assertions.assertNotNull(output);
+        Assertions.assertEquals(1, output.getProcessedItemsTotal());
+
+        InputStream is = runContext.storage().getFile(output.getUri());
+        List<String> transformationResult = FileSerde.readAll(new InputStreamReader(is), new TypeReference<String>() {
+        }).collectList().block();
+
+        Assertions.assertEquals(1, transformationResult.size());
+        Assertions.assertEquals("ThinkPad by Lenovo", transformationResult.get(0));
     }
 }

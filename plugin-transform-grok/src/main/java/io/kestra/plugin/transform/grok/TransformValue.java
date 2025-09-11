@@ -74,8 +74,6 @@ import java.util.Map;
 )
 public class TransformValue extends Transform implements GrokInterface, RunnableTask<Output> {
 
-    private static final ObjectMapper ION_OBJECT_MAPPER = JacksonMapper.ofIon();
-
     @Schema(title = "The value to parse.")
     @NotNull
     private Property<String> from;

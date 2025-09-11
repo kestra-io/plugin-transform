@@ -1,7 +1,6 @@
 package io.kestra.plugin.transform.grok;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -11,23 +10,13 @@ import io.kestra.core.models.tasks.Output;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
-import io.kestra.core.serializers.JacksonMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 import lombok.experimental.SuperBuilder;
 import reactor.core.publisher.Flux;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Reader;
-import java.io.Writer;
+import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -82,8 +71,6 @@ import java.util.Map;
 )
 public class TransformItems extends Transform implements GrokInterface, RunnableTask<Output> {
 
-    private static final ObjectMapper ION_OBJECT_MAPPER = JacksonMapper.ofIon();
-
     @Schema(
         title = "The file to be transformed.",
         description = "Must be a `kestra://` internal storage URI."
@@ -106,7 +93,7 @@ public class TransformItems extends Transform implements GrokInterface, Runnable
             Flux<String> flux = FileSerde.readAll(reader, new TypeReference<>() {
             });
             final Path ouputFilePath = runContext.workingDir().createTempFile(".ion");
-            try(Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(ouputFilePath)))) {
+            try (Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(ouputFilePath)))) {
 
                 // transform
                 Flux<Map<String, Object>> values = flux.map(data -> {
