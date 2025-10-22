@@ -1,0 +1,37 @@
+<svg
+    width="38.800034mm"
+    height="9.7668142mm"
+    viewBox="0 0 38.800033 9.7668142"
+    version="1.1"
+    id="svg1"
+    xmlns="http://www.w3.org/2000/svg"
+    xmlns:svg="http://www.w3.org/2000/svg">
+    <defs
+        id="defs1" />
+    <g
+        id="layer1"
+        transform="translate(-37.50319,-107.70513)">
+        <text
+            xml:space="preserve"
+            style="font-style:normal;font-weight:normal;font-size:10.5833px;line-height:1.25;font-family:sans-serif;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+            x="36.908913"
+            y="116.46806"
+            id="text1"><tspan
+         id="tspan1"
+         style="stroke-width:0.264583"
+         x="36.908913"
+         y="116.46806"
+         fill="currentColor">Grok </tspan></text>
+        <text
+            xml:space="preserve"
+            style="font-style:normal;font-weight:normal;font-size:10.5833px;line-height:1.25;font-family:sans-serif;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
+            x="64.159302"
+            y="115.74596"
+            id="text2"><tspan
+         id="tspan2"
+         style="stroke-width:0.264583"
+         x="64.159302"
+         y="115.74596"
+         fill="currentColor">{}</tspan></text>
+    </g>
+</svg>
