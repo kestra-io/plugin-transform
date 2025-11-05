@@ -102,7 +102,8 @@ public class TransformItems extends Transform implements GrokInterface, Runnable
                     } catch (IllegalVariableEvaluationException e) {
                         throw new RuntimeException(e);
                     }
-                });
+                }).filter(result -> result != null && !result.isEmpty());
+
                 Long processedItemsTotal = FileSerde.writeAll(writer, values).block();
                 URI uri = runContext.storage().putFile(ouputFilePath.toFile());
 
