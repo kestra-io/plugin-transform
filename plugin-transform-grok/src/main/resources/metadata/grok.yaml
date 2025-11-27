@@ -1,10 +1,6 @@
 group: io.kestra.plugin.transform.grok
 name: "grok"
-<<<<<<< Updated upstream
-title: "ugrok"
-=======
 title: "Grok"
->>>>>>> Stashed changes
 description: ""
 body: ""
 videos: []
