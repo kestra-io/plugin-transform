@@ -1,8 +1,8 @@
 group: io.kestra.plugin.transform.jsonata
 name: "jsonata"
 title: "JSONata"
-description: ""
-body: ""
+description: "Tasks that transform JSON using JSONata expressions."
+body: "Provide input JSON and a JSONata expression to reshape or filter data, with optional variables and environment settings; outputs the transformed JSON for subsequent tasks."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

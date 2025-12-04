@@ -1,8 +1,8 @@
 group: io.kestra.plugin.transform.grok
 name: "grok"
 title: "Grok"
-description: ""
-body: ""
+description: "Tasks that parse text using Grok patterns."
+body: "Provide input strings or files with Grok patterns and optional custom pattern definitions to extract structured fields from logs or messages, emitting parsed records for downstream processing."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
