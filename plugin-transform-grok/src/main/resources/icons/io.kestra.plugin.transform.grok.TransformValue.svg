@@ -1,37 +1,4 @@
-<svg
-        width="38.800034mm"
-        height="9.7668142mm"
-        viewBox="0 0 38.800033 9.7668142"
-        version="1.1"
-        id="svg1"
-        xmlns="http://www.w3.org/2000/svg"
-        xmlns:svg="http://www.w3.org/2000/svg">
-    <defs
-            id="defs1" />
-    <g
-            id="layer1"
-            transform="translate(-37.50319,-107.70513)">
-        <text
-                xml:space="preserve"
-                style="font-style:normal;font-weight:normal;font-size:10.5833px;line-height:1.25;font-family:sans-serif;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
-                x="36.908913"
-                y="116.46806"
-                id="text1"><tspan
-         id="tspan1"
-         style="stroke-width:0.264583"
-         x="36.908913"
-         y="116.46806"
-         fill="currentColor">Grok </tspan></text>
-        <text
-                xml:space="preserve"
-                style="font-style:normal;font-weight:normal;font-size:10.5833px;line-height:1.25;font-family:sans-serif;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583"
-                x="64.159302"
-                y="115.74596"
-                id="text2"><tspan
-         id="tspan2"
-         style="stroke-width:0.264583"
-         x="64.159302"
-         y="115.74596"
-         fill="currentColor">{}</tspan></text>
-    </g>
+<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="12.2698" y="11.9858" width="57" height="57" rx="5" fill="black"/>
+    <path d="M29.5183 29.2139C34.1068 24.6234 40.8649 23.4655 46.5095 25.791C47.7583 26.2554 48.8469 26.9168 49.696 27.5312L44.9822 29.71C40.5935 27.8668 35.5663 29.1212 32.4978 32.1934C28.413 36.2795 27.5366 43.318 32.1492 47.9736L32.3689 48.1973L19.0925 60.0713C19.9344 58.9106 20.9796 57.8141 22.0212 56.7178C24.9613 53.6241 27.8805 50.5587 26.1003 46.2256C23.7169 40.4276 25.1046 33.6329 29.5183 29.2139ZM60.5964 20.3613C56.2255 26.3879 54.0917 29.3357 55.8044 36.709L55.7937 36.6982C56.9747 41.7173 55.7119 47.283 51.6335 51.3662C46.4919 56.5175 38.2638 57.6641 31.488 53.0273L36.2126 50.8369C40.5371 52.5372 45.2684 51.791 48.6687 48.3867C52.069 44.9823 52.8318 40.0234 51.1228 35.8975C50.7979 35.1155 49.8247 34.9194 49.1433 35.4229L35.238 45.7002L55.155 25.6699V25.6875L60.907 19.9297C60.8036 20.076 60.6997 20.2185 60.5964 20.3613Z" fill="white"/>
 </svg>
