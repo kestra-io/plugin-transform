@@ -1,0 +1,44 @@
+id: dummyjson_users
+namespace: dev.examples
+
+tasks:
+  - id: download_users
+    type: io.kestra.plugin.core.http.Download
+    uri: https://dummyjson.com/users?limit=50
+
+  - id: explode_users
+    type: io.kestra.plugin.transform.Unnest
+    from: "{{ outputs.download_users.uri }}"
+    path: users[]
+    as: user
+    output: RECORDS
+
+  - id: project_users
+    type: io.kestra.plugin.transform.Map
+    from: "{{ outputs.explode_users.records }}"
+    output: STORE
+    fields:
+      id:
+        expr: user.id
+        type: INT
+      first_name:
+        expr: user.firstName
+        type: STRING
+      last_name:
+        expr: user.lastName
+        type: STRING
+      age:
+        expr: user.age
+        type: INT
+      country:
+        expr: user.address.country
+        type: STRING
+      company:
+        expr: user.company.name
+        type: STRING
+
+  - id: senior_us_users
+    type: io.kestra.plugin.transform.Filter
+    from: "{{ outputs.project_users.uri }}"
+    where: age >= 40 && country == "United States"
+    output: RECORDS

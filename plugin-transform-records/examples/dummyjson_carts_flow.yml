@@ -1,0 +1,76 @@
+id: dummyjson_carts
+namespace: dev.examples
+
+tasks:
+  # Fetch carts payload from DummyJSON.
+  - id: download_carts
+    type: io.kestra.plugin.core.http.Download
+    uri: https://dummyjson.com/carts?limit=20
+
+  # Explode the top-level carts array into one record per cart.
+  - id: explode_carts
+    type: io.kestra.plugin.transform.Unnest
+    from: "{{ outputs.download_carts.uri }}"
+    path: carts[]
+    as: cart
+    output: RECORDS
+
+  # Project cart fields to top-level and keep products for the next unnest.
+  - id: project_cart
+    type: io.kestra.plugin.transform.Map
+    from: "{{ outputs.explode_carts.records }}"
+    output: RECORDS
+    fields:
+      id:
+        expr: cart.id
+        type: INT
+      user_id:
+        expr: cart.userId
+        type: INT
+      total:
+        expr: cart.total
+        type: DECIMAL
+      discounted_total:
+        expr: cart.discountedTotal
+        type: DECIMAL
+      total_products:
+        expr: cart.totalProducts
+        type: INT
+      total_quantity:
+        expr: cart.totalQuantity
+        type: INT
+      products:
+        expr: cart.products
+        type: LIST
+      max_product_total:
+        expr: max(cart.products[].total)
+        type: DECIMAL
+
+  # Keep carts with products whose line total exceeds 10k.
+  - id: large_carts
+    type: io.kestra.plugin.transform.Filter
+    from: "{{ outputs.project_cart.records }}"
+    where: max_product_total > 10000
+    output: STORE
+
+  # Project final cart and product fields for downstream use.
+  - id: project_cart_fields
+    type: io.kestra.plugin.transform.Map
+    from: "{{ outputs.large_carts.uri }}"
+    output: RECORDS
+    fields:
+      id:
+        expr: id
+        type: INT
+      user_id:
+        expr: user_id
+        type: INT
+      total:
+        expr: total
+        type: DECIMAL
+      discounted_total:
+        expr: discounted_total
+        type: DECIMAL
+      max_product_total:
+        expr: max_product_total
+        type: DECIMAL

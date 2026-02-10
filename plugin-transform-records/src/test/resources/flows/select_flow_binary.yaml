@@ -1,0 +1,36 @@
+id: select_flow_binary
+namespace: io.kestra.tests
+
+tasks:
+  - id: left
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - a: 1
+
+  - id: right
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - b: 2
+
+  - id: select
+    type: io.kestra.plugin.transform.Select
+    inputs:
+      - "{{ outputs.left.values.records }}"
+      - "{{ outputs.right.values.records }}"
+    output: STORE
+    outputFormat: BINARY
+
+  - id: read_back
+    type: io.kestra.plugin.transform.Map
+    from: "{{ outputs.select.uri }}"
+    output: RECORDS
+    fields:
+      a:
+        expr: a
+        type: INT
+      b:
+        expr: b
+        type: INT
+
