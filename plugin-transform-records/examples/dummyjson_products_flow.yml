@@ -1,0 +1,35 @@
+id: dummyjson_products
+namespace: dev.examples
+
+tasks:
+  - id: download_products
+    type: io.kestra.plugin.core.http.Download
+    uri: https://dummyjson.com/products?limit=50
+
+  - id: explode_products
+    type: io.kestra.plugin.transform.Unnest
+    from: "{{ outputs.download_products.uri }}"
+    path: products[]
+    as: product
+    outputType: RECORDS
+
+  - id: expensive_products
+    type: io.kestra.plugin.transform.Filter
+    from: "{{ outputs.explode_products.records }}"
+    where: product.price > 500
+    outputType: STORE
+
+  - id: project_fields
+    type: io.kestra.plugin.transform.Map
+    from: "{{ outputs.expensive_products.uri }}"
+    outputType: RECORDS
+    fields:
+      id:
+        expr: product.id
+        type: INT
+      title:
+        expr: product.title
+        type: STRING
+      price:
+        expr: product.price
+        type: DECIMAL

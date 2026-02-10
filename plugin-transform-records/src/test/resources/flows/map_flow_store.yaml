@@ -1,0 +1,19 @@
+id: map_flow_store
+namespace: io.kestra.tests
+
+tasks:
+  - id: fetch
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - value: 1
+        - value: 2
+
+  - id: map
+    type: io.kestra.plugin.transform.Map
+    from: "{{ outputs.fetch.values.records }}"
+    outputType: STORE
+    fields:
+      value:
+        expr: value
+        type: INT

@@ -1,0 +1,26 @@
+id: map_flow
+namespace: io.kestra.tests
+
+tasks:
+  - id: fetch
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - user:
+            id: "u-1"
+          createdAt: "2024-01-01T00:00:00Z"
+          items:
+            - price: "10.00"
+            - price: "5.25"
+
+  - id: map
+    type: io.kestra.plugin.transform.Map
+    from: "{{ outputs.fetch.values.records }}"
+    fields:
+      customer_id: user.id
+      created_at:
+        expr: createdAt
+        type: TIMESTAMP
+      total:
+        expr: sum(items[].price)
+        type: DECIMAL
