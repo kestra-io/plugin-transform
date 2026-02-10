@@ -15,4 +15,4 @@ tasks:
     type: io.kestra.plugin.transform.Filter
     from: "{{ outputs.fetch.values.records }}"
     where: active && total < 10
-    output: STORE
+    outputType: STORE

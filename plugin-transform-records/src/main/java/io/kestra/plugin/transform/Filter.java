@@ -5,6 +5,7 @@ import com.amazon.ion.IonList;
 import com.amazon.ion.IonStruct;
 import com.amazon.ion.IonValue;
 import com.amazon.ion.IonWriter;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.executions.metrics.Counter;
@@ -20,6 +21,7 @@ import io.kestra.plugin.transform.util.TransformProfiler;
 import io.kestra.plugin.transform.util.TransformTaskSupport;
 import io.kestra.plugin.transform.util.TransformException;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -34,6 +36,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -44,17 +47,37 @@ import java.util.UUID;
 @NoArgsConstructor
 @Schema(
     title = "Filter records",
-    description = "Keep or drop records based on a boolean expression."
+    description = """
+        Keep or drop records based on a boolean expression.
+        """
 )
 @Plugin(
     examples = {
         @io.kestra.core.models.annotations.Example(
             title = "Keep active customers",
-            code = {
-                "from: \"{{ outputs.normalize.records }}\"",
-                "where: is_active && total_spent > 100",
-                "onError: SKIP"
-            }
+            full = true,
+            code = """
+                id: filter_active_customers
+                namespace: company.team
+
+                tasks:
+                  - id: normalize
+                    type: io.kestra.plugin.core.output.OutputValues
+                    values:
+                      records:
+                        - customer_id: c1
+                          is_active: true
+                          total_spent: 120
+                        - customer_id: c2
+                          is_active: false
+                          total_spent: 90
+
+                  - id: filter
+                    type: io.kestra.plugin.transform.Filter
+                    from: "{{ outputs.normalize.values.records }}"
+                    where: is_active && total_spent > 100
+                    onError: SKIP
+                """
         )
     },
     metrics = {
@@ -65,54 +88,75 @@ import java.util.UUID;
     }
 )
 public class Filter extends Task implements RunnableTask<Filter.Output> {
+    @NotNull
     @Schema(
         title = "Input records",
-        description = "Ion list or struct to transform, or a storage URI pointing to an Ion file."
+        description = """
+        Ion list or struct to transform, or a storage URI pointing to an Ion file.
+        """
     )
     private Property<Object> from;
 
+    @NotNull
     @Schema(
         title = "Filter expression",
-        description = "Boolean expression evaluated on each record."
+        description = """
+        Boolean expression evaluated on each record.
+        """
     )
     private Property<String> where;
 
     @Builder.Default
-    @Schema(title = "On error behavior")
-    private OnErrorMode onError = OnErrorMode.FAIL;
+    @Schema(
+        title = "On error behavior",
+        description = """
+        FAIL stops the task on expression errors, SKIP drops the current record, and KEEP keeps the current record.
+        """
+    )
+    private Property<OnErrorMode> onError = Property.ofValue(OnErrorMode.FAIL);
 
     @Builder.Default
     @Schema(
         title = "Output format",
-        description = "Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step."
+        description = """
+        Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step.
+        """
     )
-    private OutputFormat outputFormat = OutputFormat.TEXT;
+    private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
 
     @Schema(
-        title = "Output mode",
-        description = "AUTO stores to internal storage when the input is a storage URI; otherwise it returns records."
+        title = "Output type",
+        description = """
+        AUTO stores to internal storage when the input is a storage URI; otherwise it returns records.
+        """
     )
     @Builder.Default
-    private OutputMode output = OutputMode.AUTO;
+    private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        TransformTaskSupport.ResolvedInput resolvedInput = TransformTaskSupport.resolveInput(runContext, from);
+        if (from == null) {
+            throw new TransformException("from is required");
+        }
+        var resolvedInput = TransformTaskSupport.resolveInput(runContext, from);
+        var rOnError = runContext.render(this.onError).as(OnErrorMode.class).orElseThrow();
+        var rOutputFormat = runContext.render(this.outputFormat).as(OutputFormat.class).orElseThrow();
+        var rOutputType = runContext.render(this.outputType).as(OutputMode.class).orElseThrow();
 
-        String whereExpr = runContext.render(where).as(String.class).orElse(null);
+        var whereExpr = runContext.render(where).as(String.class).orElse(null);
         if (whereExpr == null || whereExpr.isBlank()) {
             throw new TransformException("where is required");
         }
 
-        DefaultExpressionEngine expressionEngine = new DefaultExpressionEngine();
-        StatsAccumulator stats = new StatsAccumulator();
+        var expressionEngine = new DefaultExpressionEngine();
+        var stats = new StatsAccumulator();
 
-        OutputMode effectiveOutput = output == OutputMode.AUTO
+        var effectiveOutput = rOutputType == OutputMode.AUTO
             ? (resolvedInput.fromStorage() ? OutputMode.STORE : OutputMode.RECORDS)
-            : output;
+            : rOutputType;
 
         if (resolvedInput.fromStorage() && effectiveOutput == OutputMode.STORE) {
-            URI storedUri = filterStreamToStorage(runContext, resolvedInput.storageUri(), whereExpr, expressionEngine, stats);
+            var storedUri = filterStreamToStorage(runContext, resolvedInput.storageUri(), whereExpr, expressionEngine, stats, rOnError, rOutputFormat);
             runContext.metric(Counter.of("processed", stats.processed))
                 .metric(Counter.of("passed", stats.passed))
                 .metric(Counter.of("dropped", stats.dropped))
@@ -122,9 +166,9 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
                 .build();
         }
 
-        List<IonStruct> records = TransformTaskSupport.normalizeRecords(resolveInMemory(runContext, resolvedInput));
+        var records = TransformTaskSupport.normalizeRecords(resolveInMemory(runContext, resolvedInput));
         if (effectiveOutput == OutputMode.STORE) {
-            URI storedUri = storeRecords(runContext, records, whereExpr, expressionEngine, stats);
+            var storedUri = storeRecords(runContext, records, whereExpr, expressionEngine, stats, rOnError, rOutputFormat);
             runContext.metric(Counter.of("processed", stats.processed))
                 .metric(Counter.of("passed", stats.passed))
                 .metric(Counter.of("dropped", stats.dropped))
@@ -134,7 +178,7 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
                 .build();
         }
 
-        List<Object> rendered = filterToRecords(records, whereExpr, expressionEngine, stats);
+        var rendered = filterToRecords(records, whereExpr, expressionEngine, stats, rOnError);
         runContext.metric(Counter.of("processed", stats.processed))
             .metric(Counter.of("passed", stats.passed))
             .metric(Counter.of("dropped", stats.dropped))
@@ -154,7 +198,8 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
     private List<Object> filterToRecords(List<IonStruct> records,
                                          String whereExpr,
                                          DefaultExpressionEngine expressionEngine,
-                                         StatsAccumulator stats) throws TransformException {
+                                         StatsAccumulator stats,
+                                         OnErrorMode onError) throws TransformException {
         List<Object> outputRecords = new ArrayList<>();
         for (int i = 0; i < records.size(); i++) {
             IonStruct record = records.get(i);
@@ -189,7 +234,9 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
                              List<IonStruct> records,
                              String whereExpr,
                              DefaultExpressionEngine expressionEngine,
-                             StatsAccumulator stats) throws TransformException {
+                             StatsAccumulator stats,
+                             OnErrorMode onError,
+                             OutputFormat outputFormat) throws TransformException {
         String name = "filter-" + UUID.randomUUID() + ".ion";
         try {
             java.nio.file.Path outputPath = runContext.workingDir().createTempFile(".ion");
@@ -249,7 +296,9 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
                                       URI uri,
                                       String whereExpr,
                                       DefaultExpressionEngine expressionEngine,
-                                      StatsAccumulator stats) throws TransformException {
+                                      StatsAccumulator stats,
+                                      OnErrorMode onError,
+                                      OutputFormat outputFormat) throws TransformException {
         String name = "filter-" + UUID.randomUUID() + ".ion";
         InputStream inputStream;
         try {
@@ -269,10 +318,10 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
                     IonValue value = iterator.next();
                     if (value instanceof IonList list) {
                         for (IonValue element : list) {
-                            filterStreamRecord(element, whereExpr, expressionEngine, stats, writer, outputStream, profile);
+                            filterStreamRecord(element, whereExpr, expressionEngine, stats, writer, outputStream, profile, onError, outputFormat);
                         }
                     } else {
-                        filterStreamRecord(value, whereExpr, expressionEngine, stats, writer, outputStream, profile);
+                        filterStreamRecord(value, whereExpr, expressionEngine, stats, writer, outputStream, profile, onError, outputFormat);
                     }
                 }
                 writer.finish();
@@ -289,7 +338,9 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
                                     StatsAccumulator stats,
                                     IonWriter writer,
                                     OutputStream outputStream,
-                                    boolean profile) throws TransformException, IOException {
+                                    boolean profile,
+                                    OnErrorMode onError,
+                                    OutputFormat outputFormat) throws TransformException, IOException {
         IonStruct record = asStruct(value);
         stats.processed++;
         try {
@@ -368,7 +419,16 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
     public enum OutputMode {
         AUTO,
         RECORDS,
-        STORE
+        STORE;
+
+        @JsonCreator
+        public static OutputMode from(Object value) {
+            if (value == null) {
+                return null;
+            }
+            String raw = String.valueOf(value).trim();
+            return OutputMode.valueOf(raw.toUpperCase(Locale.ROOT));
+        }
     }
 
     private static final class StatsAccumulator {
@@ -383,13 +443,17 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
             title = "Stored Ion file URI",
-            description = "URI to the stored Ion file when output mode is STORE or AUTO resolves to STORE."
+            description = """
+        URI to the stored Ion file when output mode is STORE or AUTO resolves to STORE.
+        """
         )
         private final String uri;
 
         @Schema(
             title = "Filtered records",
-            description = "JSON-safe records when output mode is RECORDS or AUTO resolves to RECORDS."
+            description = """
+        JSON-safe records when output mode is RECORDS or AUTO resolves to RECORDS.
+        """
         )
         private final List<Object> records;
     }

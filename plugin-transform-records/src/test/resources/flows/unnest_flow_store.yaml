@@ -16,4 +16,4 @@ tasks:
     from: "{{ outputs.fetch.values.records }}"
     path: items[]
     as: item
-    output: STORE
+    outputType: STORE

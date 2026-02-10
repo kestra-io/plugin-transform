@@ -5,7 +5,6 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.plugin.transform.util.TransformException;
-import io.kestra.plugin.transform.util.TransformOptions;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
@@ -82,7 +81,7 @@ class ZipTest {
                 Property.ofValue(left),
                 Property.ofValue(right)
             ))
-            .onConflict(Zip.ConflictMode.RIGHT)
+            .onConflict(Property.ofValue(Zip.ConflictMode.RIGHT))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -102,13 +101,21 @@ class ZipTest {
                 Property.ofValue(left),
                 Property.ofValue(right)
             ))
-            .onError(TransformOptions.OnErrorMode.SKIP)
-            .onConflict(Zip.ConflictMode.FAIL)
+            .onError(Property.ofValue(Zip.OnErrorMode.SKIP))
+            .onConflict(Property.ofValue(Zip.ConflictMode.FAIL))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
         Zip.Output output = task.run(runContext);
 
         assertThat(output.getRecords(), hasSize(0));
+    }
+
+    @Test
+    void outputModeUriIsRejected() {
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> Zip.OutputMode.from("URI")
+        );
     }
 }

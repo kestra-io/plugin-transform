@@ -52,12 +52,12 @@ class SelectTest {
                 Property.ofValue(scores)
             ))
             .where(Property.ofValue("amount > 100 && $3.score > 0.8"))
-            .fields(Map.of(
+            .fields(Property.ofValue(Map.of(
                 "orderId", Select.FieldDefinition.from("order_id"),
                 "customer", Select.FieldDefinition.from("$2.name"),
                 "amount", Select.FieldDefinition.from("$1.amount"),
                 "score", Select.FieldDefinition.from("$3.score")
-            ))
+            )))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -101,7 +101,7 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
-            .dropNulls(true)
+            .dropNulls(Property.ofValue(true))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -120,8 +120,8 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
-            .fields(Map.of("sum", Select.FieldDefinition.from("a + b")))
-            .keepInputFields(List.of(1, 2))
+            .fields(Property.ofValue(Map.of("sum", Select.FieldDefinition.from("a + b"))))
+            .keepInputFields(Property.ofValue(List.of(1, 2)))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -140,7 +140,7 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
-            .fields(Map.of("a", Select.FieldDefinition.from("a")))
+            .fields(Property.ofValue(Map.of("a", Select.FieldDefinition.from("a"))))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -159,8 +159,8 @@ class SelectTest {
 
         Select drop = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
-            .fields(Map.of("missing", Select.FieldDefinition.builder().expr("c").optional(true).build()))
-            .dropNulls(true)
+            .fields(Property.ofValue(Map.of("missing", Select.FieldDefinition.builder().expr("c").optional(true).build())))
+            .dropNulls(Property.ofValue(true))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -170,11 +170,9 @@ class SelectTest {
 
         Select keep = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
-            .fields(Map.of("missing", Select.FieldDefinition.builder().expr("c").optional(true).build()))
-            .dropNulls(false)
+            .fields(Property.ofValue(Map.of("missing", Select.FieldDefinition.builder().expr("c").optional(true).build())))
+            .dropNulls(Property.ofValue(false))
             .build();
-
-        assertThat(keep.isDropNulls(), is(false));
 
         Select.Output kept = keep.run(runContext);
         Map<String, Object> keptRecord = (Map<String, Object>) kept.getRecords().getFirst();
@@ -189,7 +187,7 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
-            .onLengthMismatch(Select.OnLengthMismatchMode.SKIP)
+            .onLengthMismatch(Property.ofValue(Select.OnLengthMismatchMode.SKIP))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -205,7 +203,7 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
-            .onLengthMismatch(Select.OnLengthMismatchMode.FAIL)
+            .onLengthMismatch(Property.ofValue(Select.OnLengthMismatchMode.FAIL))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -238,7 +236,7 @@ class SelectTest {
         fields.put("a", null);
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left)))
-            .fields(fields)
+            .fields(Property.ofValue(fields))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -256,7 +254,7 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left)))
-            .fields(Map.of("a", Select.FieldDefinition.builder().expr("  ").build()))
+            .fields(Property.ofValue(Map.of("a", Select.FieldDefinition.builder().expr("  ").build())))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -275,8 +273,8 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
-            .fields(Map.of("bad", Select.FieldDefinition.from("unknownFunction()")))
-            .onError(Select.OnErrorMode.KEEP)
+            .fields(Property.ofValue(Map.of("bad", Select.FieldDefinition.from("unknownFunction()"))))
+            .onError(Property.ofValue(Select.OnErrorMode.KEEP))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -297,7 +295,7 @@ class SelectTest {
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
             .where(Property.ofValue("unknownFunction()"))
-            .onError(Select.OnErrorMode.SKIP)
+            .onError(Property.ofValue(Select.OnErrorMode.SKIP))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -307,8 +305,11 @@ class SelectTest {
     }
 
     @Test
-    void outputModeUriIsAliasForStore() {
-        assertThat(Select.OutputMode.from("URI"), is(Select.OutputMode.STORE));
+    void outputModeUriIsRejected() {
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> Select.OutputMode.from("URI")
+        );
     }
 
     @Test
@@ -332,10 +333,10 @@ class SelectTest {
                 Property.ofValue(scoresUri.toString())
             ))
             .where(Property.ofValue("$2.score > 0.8"))
-            .fields(Map.of(
+            .fields(Property.ofValue(Map.of(
                 "order_id", Select.FieldDefinition.from("$1.order_id"),
                 "score", Select.FieldDefinition.from("$2.score")
-            ))
+            )))
             .build();
 
         Select.Output output = task.run(runContext);
@@ -359,12 +360,12 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
-            .fields(Map.of(
+            .fields(Property.ofValue(Map.of(
                 "a", Select.FieldDefinition.from("a"),
                 "c", Select.FieldDefinition.from("c")
-            ))
-            .output(Select.OutputMode.STORE)
-            .outputFormat(OutputFormat.TEXT)
+            )))
+            .outputType(Property.ofValue(Select.OutputMode.STORE))
+            .outputFormat(Property.ofValue(OutputFormat.TEXT))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -389,8 +390,8 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
-            .output(Select.OutputMode.STORE)
-            .outputFormat(OutputFormat.BINARY)
+            .outputType(Property.ofValue(Select.OutputMode.STORE))
+            .outputFormat(Property.ofValue(OutputFormat.BINARY))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -427,7 +428,7 @@ class SelectTest {
                 Property.ofValue(leftUri.toString()),
                 Property.ofValue(rightUri.toString())
             ))
-            .output(Select.OutputMode.RECORDS)
+            .outputType(Property.ofValue(Select.OutputMode.RECORDS))
             .build();
 
         Select.Output output = task.run(runContext);
@@ -445,11 +446,11 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
-            .fields(Map.of(
+            .fields(Property.ofValue(Map.of(
                 "customer_id", Select.FieldDefinition.builder().expr("customer_id").type(io.kestra.plugin.transform.ion.IonTypeName.STRING).build(),
                 "total_spent", Select.FieldDefinition.builder().expr("total_spent").type(io.kestra.plugin.transform.ion.IonTypeName.DECIMAL).build()
-            ))
-            .output(Select.OutputMode.RECORDS)
+            )))
+            .outputType(Property.ofValue(Select.OutputMode.RECORDS))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -466,11 +467,11 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left)))
-            .fields(Map.of(
+            .fields(Property.ofValue(Map.of(
                 "total_spent", Select.FieldDefinition.builder().expr("total_spent").type(io.kestra.plugin.transform.ion.IonTypeName.DECIMAL).build()
-            ))
-            .onError(Select.OnErrorMode.SKIP)
-            .output(Select.OutputMode.RECORDS)
+            )))
+            .onError(Property.ofValue(Select.OnErrorMode.SKIP))
+            .outputType(Property.ofValue(Select.OutputMode.RECORDS))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -484,11 +485,11 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left)))
-            .fields(Map.of(
+            .fields(Property.ofValue(Map.of(
                 "total_spent", Select.FieldDefinition.builder().expr("total_spent").type(io.kestra.plugin.transform.ion.IonTypeName.DECIMAL).build()
-            ))
-            .onError(Select.OnErrorMode.KEEP)
-            .output(Select.OutputMode.RECORDS)
+            )))
+            .onError(Property.ofValue(Select.OnErrorMode.KEEP))
+            .outputType(Property.ofValue(Select.OutputMode.RECORDS))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -505,9 +506,9 @@ class SelectTest {
 
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(left), Property.ofValue(right)))
-            .fields(Map.of(
+            .fields(Property.ofValue(Map.of(
                 "total_spent", Select.FieldDefinition.builder().expr("total_spent").optional(false).build()
-            ))
+            )))
             .build();
 
         RunContext runContext = runContextFactory.of(Map.of());
@@ -539,8 +540,8 @@ class SelectTest {
                 Property.ofValue(leftUri.toString()),
                 Property.ofValue(rightUri.toString())
             ))
-            .onLengthMismatch(Select.OnLengthMismatchMode.SKIP)
-            .output(Select.OutputMode.STORE)
+            .onLengthMismatch(Property.ofValue(Select.OnLengthMismatchMode.SKIP))
+            .outputType(Property.ofValue(Select.OutputMode.STORE))
             .build();
 
         Select.Output output = task.run(runContext);

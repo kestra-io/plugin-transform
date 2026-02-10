@@ -24,6 +24,7 @@ import io.kestra.plugin.transform.util.TransformException;
 import io.kestra.plugin.transform.util.TransformProfiler;
 import io.kestra.plugin.transform.util.TransformTaskSupport;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -39,6 +40,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @SuperBuilder
@@ -48,24 +50,57 @@ import java.util.UUID;
 @NoArgsConstructor
 @Schema(
     title = "Select records",
-    description = "Align multiple inputs by position, optionally filter rows, and project output records."
+    description = """
+        Align multiple inputs by position, optionally filter rows, and project output records.
+        """
 )
 @Plugin(
     examples = {
         @io.kestra.core.models.annotations.Example(
-            title = "Enrich and filter by row position",
-            code = {
-                "inputs:",
-                "  - \"{{ outputs.orders.uri }}\"",
-                "  - \"{{ outputs.customers.uri }}\"",
-                "  - \"{{ outputs.scores.uri }}\"",
-                "where: amount > 100 && $3.score > 0.8",
-                "fields:",
-                "  orderId: order_id",
-                "  customer: $2.name",
-                "  amount: $1.amount",
-                "  score: $3.score"
-            }
+            title = "Join three inputs by row position, filter, and project typed fields",
+            full = true,
+            code = """
+                id: select_join_inputs
+                namespace: company.team
+
+                tasks:
+                  - id: orders
+                    type: io.kestra.plugin.core.output.OutputValues
+                    values:
+                      records:
+                        - order_id: o1
+                          amount: 120
+                        - order_id: o2
+                          amount: 70
+
+                  - id: customers
+                    type: io.kestra.plugin.core.output.OutputValues
+                    values:
+                      records:
+                        - name: Alice
+                        - name: Bob
+
+                  - id: scores
+                    type: io.kestra.plugin.core.output.OutputValues
+                    values:
+                      records:
+                        - score: 0.9
+                        - score: 0.4
+
+                  - id: select
+                    type: io.kestra.plugin.transform.Select
+                    inputs:
+                      - "{{ outputs.orders.values.records }}"
+                      - "{{ outputs.customers.values.records }}"
+                      - "{{ outputs.scores.values.records }}"
+                    where: amount > 100 && $3.score > 0.8
+                    fields:
+                      orderId: order_id
+                      customer: $2.name
+                      amount: $1.amount
+                      score: $3.score
+                    outputType: RECORDS
+                """
         )
     },
     metrics = {
@@ -76,67 +111,100 @@ import java.util.UUID;
     }
 )
 public class Select extends Task implements RunnableTask<Select.Output> {
+    @NotNull
     @Schema(
         title = "Input records",
-        description = "List of inputs (Ion list/struct or storage URIs) to align by row position."
+        description = """
+        List of one or more inputs (Ion list/struct or storage URIs) to align by row position.
+        """
     )
     private List<Property<Object>> inputs;
 
     @Schema(
         title = "Filter expression",
-        description = "Optional boolean expression evaluated on each merged row (supports $1, $2, ...)."
+        description = """
+        Optional boolean expression evaluated on each merged row (supports $1, $2, ...).
+        """
     )
     private Property<String> where;
 
     @Schema(
         title = "Projection mappings",
-        description = "Optional mapping of output field names to expressions and types (supports $1, $2, ...). If omitted, outputs the merged row."
+        description = """
+        Optional mapping of output field names to expressions and types (supports $1, $2, ...). If omitted, outputs the merged row.
+        """
     )
-    private java.util.Map<String, FieldDefinition> fields;
+    private Property<java.util.Map<String, FieldDefinition>> fields;
 
     @Schema(
         title = "Keep input fields",
-        description = "When fields are provided, include the selected input fields (1-based indices) in addition to projected fields."
+        description = """
+        When fields are provided, include the selected input fields (1-based indices) in addition to projected fields.
+        """
     )
     @Builder.Default
-    private List<Integer> keepInputFields = List.of();
+    private Property<List<Integer>> keepInputFields = Property.ofValue(List.of());
 
     @Builder.Default
     @Schema(title = "Drop null fields")
-    private boolean dropNulls = true;
+    private Property<Boolean> dropNulls = Property.ofValue(true);
 
     @Builder.Default
-    @Schema(title = "On length mismatch behavior")
-    private OnLengthMismatchMode onLengthMismatch = OnLengthMismatchMode.FAIL;
+    @Schema(
+        title = "On length mismatch behavior",
+        description = """
+        FAIL errors when input lengths differ. SKIP processes aligned rows only and stops at the shortest input.
+        """
+    )
+    private Property<OnLengthMismatchMode> onLengthMismatch = Property.ofValue(OnLengthMismatchMode.FAIL);
 
     @Builder.Default
-    @Schema(title = "On error behavior")
-    private OnErrorMode onError = OnErrorMode.FAIL;
+    @Schema(
+        title = "On error behavior",
+        description = """
+        FAIL stops the task on row errors, SKIP drops the current row, and KEEP emits the merged input row.
+        """
+    )
+    private Property<OnErrorMode> onError = Property.ofValue(OnErrorMode.FAIL);
 
     @Builder.Default
     @Schema(
         title = "Output format",
-        description = "Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step."
+        description = """
+        Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step.
+        """
     )
-    private OutputFormat outputFormat = OutputFormat.TEXT;
+    private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
 
     @Schema(
-        title = "Output mode",
-        description = "AUTO stores to internal storage when any input is a storage URI; otherwise it returns records."
+        title = "Output type",
+        description = """
+        AUTO stores to internal storage when any input is a storage URI; otherwise it returns records. If one input is a URI and another is in-memory records, AUTO still resolves to STORE.
+        """
     )
     @Builder.Default
-    private OutputMode output = OutputMode.AUTO;
+    private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
     @Override
     public Output run(RunContext runContext) throws Exception {
         if (inputs == null || inputs.isEmpty()) {
             throw new TransformException("inputs is required");
         }
+        var rOnLengthMismatch = runContext.render(this.onLengthMismatch).as(OnLengthMismatchMode.class).orElseThrow();
+        var rOnError = runContext.render(this.onError).as(OnErrorMode.class).orElseThrow();
+        var rOutputFormat = runContext.render(this.outputFormat).as(OutputFormat.class).orElseThrow();
+        var rOutputType = runContext.render(this.outputType).as(OutputMode.class).orElseThrow();
+        var rKeepInputFields = runContext.render(this.keepInputFields).asList(Integer.class);
+        if (rKeepInputFields == null) {
+            rKeepInputFields = List.of();
+        }
+        var rDropNulls = runContext.render(this.dropNulls).as(Boolean.class).orElse(true);
+        var rFields = fields == null ? null : runContext.render(this.fields).asMap(String.class, FieldDefinition.class);
 
-        List<TransformTaskSupport.ResolvedInput> resolvedInputs = new ArrayList<>(inputs.size());
-        boolean anyFromStorage = false;
+        var resolvedInputs = new ArrayList<TransformTaskSupport.ResolvedInput>(inputs.size());
+        var anyFromStorage = false;
         for (Property<Object> input : inputs) {
-            TransformTaskSupport.ResolvedInput resolved = TransformTaskSupport.resolveInput(runContext, input);
+            var resolved = TransformTaskSupport.resolveInput(runContext, input);
             resolvedInputs.add(resolved);
             anyFromStorage = anyFromStorage || resolved.fromStorage();
         }
@@ -149,12 +217,12 @@ public class Select extends Task implements RunnableTask<Select.Output> {
             whereExpr = null;
         }
 
-        boolean needsPositionalContext = false;
+        var needsPositionalContext = false;
         if (whereExpr != null && whereExpr.contains("$")) {
             needsPositionalContext = true;
         }
-        if (!needsPositionalContext && fields != null) {
-            for (FieldDefinition definition : fields.values()) {
+        if (!needsPositionalContext && rFields != null) {
+            for (FieldDefinition definition : rFields.values()) {
                 if (definition != null && definition.expr != null && definition.expr.contains("$")) {
                     needsPositionalContext = true;
                     break;
@@ -162,16 +230,16 @@ public class Select extends Task implements RunnableTask<Select.Output> {
             }
         }
 
-        OutputMode effectiveOutput = output == OutputMode.AUTO
+        var effectiveOutput = rOutputType == OutputMode.AUTO
             ? (anyFromStorage ? OutputMode.STORE : OutputMode.RECORDS)
-            : output;
+            : rOutputType;
 
-        DefaultExpressionEngine expressionEngine = new DefaultExpressionEngine();
-        DefaultIonCaster caster = new DefaultIonCaster();
-        StatsAccumulator stats = new StatsAccumulator();
+        var expressionEngine = new DefaultExpressionEngine();
+        var caster = new DefaultIonCaster();
+        var stats = new StatsAccumulator();
 
         if (effectiveOutput == OutputMode.STORE) {
-            URI storedUri = selectToStorage(runContext, resolvedInputs, whereExpr, needsPositionalContext, expressionEngine, caster, stats);
+            var storedUri = selectToStorage(runContext, resolvedInputs, whereExpr, needsPositionalContext, expressionEngine, caster, stats, rOnLengthMismatch, rOnError, rOutputFormat, rKeepInputFields, rDropNulls, rFields);
             runContext.metric(Counter.of("processed", stats.processed))
                 .metric(Counter.of("passed", stats.passed))
                 .metric(Counter.of("dropped", stats.dropped))
@@ -181,7 +249,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
                 .build();
         }
 
-        List<Object> rendered = selectToRecords(runContext, resolvedInputs, whereExpr, needsPositionalContext, expressionEngine, caster, stats);
+        var rendered = selectToRecords(runContext, resolvedInputs, whereExpr, needsPositionalContext, expressionEngine, caster, stats, rOnLengthMismatch, rOnError, rKeepInputFields, rDropNulls, rFields);
         runContext.metric(Counter.of("processed", stats.processed))
             .metric(Counter.of("passed", stats.passed))
             .metric(Counter.of("dropped", stats.dropped))
@@ -197,7 +265,12 @@ public class Select extends Task implements RunnableTask<Select.Output> {
                                          boolean needsPositionalContext,
                                          DefaultExpressionEngine expressionEngine,
                                          DefaultIonCaster caster,
-                                         StatsAccumulator stats) throws TransformException {
+                                         StatsAccumulator stats,
+                                         OnLengthMismatchMode onLengthMismatch,
+                                         OnErrorMode onError,
+                                         List<Integer> keepInputFields,
+                                         boolean dropNulls,
+                                         java.util.Map<String, FieldDefinition> fields) throws TransformException {
         try (MultiCursor cursor = openCursors(runContext, resolvedInputs)) {
             List<Object> outputRecords = new ArrayList<>();
             while (cursor.hasAlignedNext(onLengthMismatch)) {
@@ -206,7 +279,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
                 IonStruct mergedFlat = mergeFlat(sourceRows);
                 IonStruct evalContext = needsPositionalContext ? buildEvalContext(mergedFlat, sourceRows) : mergedFlat;
 
-                IonStruct outputRow = processRow(whereExpr, sourceRows, mergedFlat, evalContext, expressionEngine, caster, stats);
+                IonStruct outputRow = processRow(whereExpr, sourceRows, mergedFlat, evalContext, expressionEngine, caster, stats, onError, keepInputFields, dropNulls, fields);
                 if (outputRow == null) {
                     continue;
                 }
@@ -222,7 +295,13 @@ public class Select extends Task implements RunnableTask<Select.Output> {
                                 boolean needsPositionalContext,
                                 DefaultExpressionEngine expressionEngine,
                                 DefaultIonCaster caster,
-                                StatsAccumulator stats) throws TransformException {
+                                StatsAccumulator stats,
+                                OnLengthMismatchMode onLengthMismatch,
+                                OnErrorMode onError,
+                                OutputFormat outputFormat,
+                                List<Integer> keepInputFields,
+                                boolean dropNulls,
+                                java.util.Map<String, FieldDefinition> fields) throws TransformException {
         String name = "select-" + UUID.randomUUID() + ".ion";
         try (MultiCursor cursor = openCursors(runContext, resolvedInputs)) {
             java.nio.file.Path outputPath = runContext.workingDir().createTempFile(".ion");
@@ -237,7 +316,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
                     IonStruct mergedFlat = mergeFlat(sourceRows);
                     IonStruct evalContext = needsPositionalContext ? buildEvalContext(mergedFlat, sourceRows) : mergedFlat;
 
-                    IonStruct outputRow = processRow(whereExpr, sourceRows, mergedFlat, evalContext, expressionEngine, caster, stats);
+                    IonStruct outputRow = processRow(whereExpr, sourceRows, mergedFlat, evalContext, expressionEngine, caster, stats, onError, keepInputFields, dropNulls, fields);
                     if (profile) {
                         TransformProfiler.addTransformNs(System.nanoTime() - transformStart);
                     }
@@ -265,7 +344,11 @@ public class Select extends Task implements RunnableTask<Select.Output> {
                                  IonStruct evalContext,
                                  DefaultExpressionEngine expressionEngine,
                                  DefaultIonCaster caster,
-                                 StatsAccumulator stats) throws TransformException {
+                                 StatsAccumulator stats,
+                                 OnErrorMode onError,
+                                 List<Integer> keepInputFields,
+                                 boolean dropNulls,
+                                 java.util.Map<String, FieldDefinition> fields) throws TransformException {
         if (whereExpr == null && (fields == null || fields.isEmpty())) {
             stats.passed++;
             if (dropNulls) {
@@ -301,7 +384,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
             }
         }
 
-        IonStruct projected = projectRow(sourceRows, mergedFlat, evalContext, expressionEngine, caster, stats);
+        IonStruct projected = projectRow(sourceRows, mergedFlat, evalContext, expressionEngine, caster, stats, onError, keepInputFields, dropNulls, fields);
         if (projected == null) {
             return null;
         }
@@ -317,14 +400,18 @@ public class Select extends Task implements RunnableTask<Select.Output> {
                                  IonStruct evalContext,
                                  DefaultExpressionEngine expressionEngine,
                                  DefaultIonCaster caster,
-                                 StatsAccumulator stats) throws TransformException {
+                                 StatsAccumulator stats,
+                                 OnErrorMode onError,
+                                 List<Integer> keepInputFields,
+                                 boolean dropNulls,
+                                 java.util.Map<String, FieldDefinition> fields) throws TransformException {
         if (fields == null || fields.isEmpty()) {
             return cloneStruct(mergedFlat);
         }
 
         IonStruct output = keepInputFields == null || keepInputFields.isEmpty()
             ? IonValueUtils.system().newEmptyStruct()
-            : mergeSelectedInputs(sourceRows);
+            : mergeSelectedInputs(sourceRows, keepInputFields);
 
         for (java.util.Map.Entry<String, FieldDefinition> entry : fields.entrySet()) {
             String targetField = entry.getKey();
@@ -366,7 +453,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
         return output;
     }
 
-    private IonStruct mergeSelectedInputs(List<IonStruct> sourceRows) throws TransformException {
+    private IonStruct mergeSelectedInputs(List<IonStruct> sourceRows, List<Integer> keepInputFields) throws TransformException {
         IonStruct merged = IonValueUtils.system().newEmptyStruct();
         for (Integer index : keepInputFields) {
             if (index == null) {
@@ -626,10 +713,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
                 return null;
             }
             String raw = String.valueOf(value).trim();
-            if ("URI".equalsIgnoreCase(raw)) {
-                return STORE;
-            }
-            return OutputMode.valueOf(raw.toUpperCase(java.util.Locale.ROOT));
+            return OutputMode.valueOf(raw.toUpperCase(Locale.ROOT));
         }
     }
 
@@ -645,10 +729,14 @@ public class Select extends Task implements RunnableTask<Select.Output> {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class FieldDefinition {
+        @Schema(title = "Expression")
         private String expr;
+
+        @Schema(title = "Ion type")
         private IonTypeName type;
 
         @Builder.Default
+        @Schema(title = "Optional")
         private boolean optional = false;
 
         @JsonCreator
@@ -667,7 +755,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
                 if (typeValue instanceof IonTypeName ionTypeName) {
                     type = ionTypeName;
                 } else if (typeValue instanceof String typeString) {
-                    type = IonTypeName.valueOf(typeString);
+                    type = IonTypeName.valueOf(typeString.toUpperCase(Locale.ROOT));
                 }
                 boolean optional = optionalValue instanceof Boolean bool ? bool : false;
                 return FieldDefinition.builder()
@@ -685,13 +773,17 @@ public class Select extends Task implements RunnableTask<Select.Output> {
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
             title = "Stored Ion file URI",
-            description = "URI to the stored Ion file when output mode is STORE or AUTO resolves to STORE."
+            description = """
+        URI to the stored Ion file when output mode is STORE or AUTO resolves to STORE.
+        """
         )
         private final String uri;
 
         @Schema(
             title = "Selected records",
-            description = "JSON-safe records when output mode is RECORDS or AUTO resolves to RECORDS."
+            description = """
+        JSON-safe records when output mode is RECORDS or AUTO resolves to RECORDS.
+        """
         )
         private final List<Object> records;
     }

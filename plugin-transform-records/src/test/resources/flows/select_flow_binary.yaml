@@ -19,13 +19,13 @@ tasks:
     inputs:
       - "{{ outputs.left.values.records }}"
       - "{{ outputs.right.values.records }}"
-    output: STORE
+    outputType: STORE
     outputFormat: BINARY
 
   - id: read_back
     type: io.kestra.plugin.transform.Map
     from: "{{ outputs.select.uri }}"
-    output: RECORDS
+    outputType: RECORDS
     fields:
       a:
         expr: a

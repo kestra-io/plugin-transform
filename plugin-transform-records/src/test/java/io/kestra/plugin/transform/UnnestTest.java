@@ -58,7 +58,7 @@ class UnnestTest {
             .from(Property.ofValue(List.of(record)))
             .path(Property.ofValue("items[]"))
             .as(Property.ofValue("item"))
-            .onError(TransformOptions.OnErrorMode.NULL)
+            .onError(Property.ofValue(TransformOptions.OnErrorMode.NULL))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -80,7 +80,7 @@ class UnnestTest {
             .from(Property.ofValue(List.of(record)))
             .path(Property.ofValue("items[]"))
             .as(Property.ofValue("item"))
-            .onError(TransformOptions.OnErrorMode.SKIP)
+            .onError(Property.ofValue(TransformOptions.OnErrorMode.SKIP))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -104,5 +104,13 @@ class UnnestTest {
         );
 
         assertThat(exception.getMessage(), is("path is required"));
+    }
+
+    @Test
+    void outputModeUriIsRejected() {
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> Unnest.OutputMode.from("URI")
+        );
     }
 }

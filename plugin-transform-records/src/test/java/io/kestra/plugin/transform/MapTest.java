@@ -41,13 +41,13 @@ class MapTest {
 
         Map task = Map.builder()
             .from(Property.ofValue(List.of(record)))
-            .fields(java.util.Map.of(
+            .fields(Property.ofValue(java.util.Map.of(
                 "customer_id", Map.FieldDefinition.builder().expr("user.id").type(IonTypeName.STRING).build(),
                 "created_at", Map.FieldDefinition.builder().expr("createdAt").type(IonTypeName.TIMESTAMP).build(),
                 "total", Map.FieldDefinition.builder().expr("sum(items[].price)").type(IonTypeName.DECIMAL).build()
-            ))
-            .dropNulls(true)
-            .onError(TransformOptions.OnErrorMode.FAIL)
+            )))
+            .dropNulls(Property.ofValue(true))
+            .onError(Property.ofValue(TransformOptions.OnErrorMode.FAIL))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -67,10 +67,10 @@ class MapTest {
 
         Map task = Map.builder()
             .from(Property.ofValue(List.of(ok, bad)))
-            .fields(java.util.Map.of(
+            .fields(Property.ofValue(java.util.Map.of(
                 "value", Map.FieldDefinition.builder().expr("value").type(IonTypeName.INT).build()
-            ))
-            .onError(TransformOptions.OnErrorMode.SKIP)
+            )))
+            .onError(Property.ofValue(TransformOptions.OnErrorMode.SKIP))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -89,10 +89,10 @@ class MapTest {
 
         Map task = Map.builder()
             .from(Property.ofValue(List.of(record)))
-            .fields(java.util.Map.of(
+            .fields(Property.ofValue(java.util.Map.of(
                 "customer_id", Map.FieldDefinition.from("user.id"),
                 "active_raw", Map.FieldDefinition.builder().expr("active").build()
-            ))
+            )))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -101,6 +101,14 @@ class MapTest {
         java.util.Map<String, Object> mapped = (java.util.Map<String, Object>) output.getRecords().getFirst();
         assertThat(mapped.get("customer_id"), is("u-1"));
         assertThat(mapped.get("active_raw"), is("true"));
+    }
+
+    @Test
+    void outputModeUriIsRejected() {
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> Map.OutputMode.from("URI")
+        );
     }
 
     @Test
@@ -115,10 +123,10 @@ class MapTest {
 
         Map task = Map.builder()
             .from(Property.ofValue(uri.toString()))
-            .fields(java.util.Map.of(
+            .fields(Property.ofValue(java.util.Map.of(
                 "value", Map.FieldDefinition.builder().expr("value").type(IonTypeName.INT).build()
-            ))
-            .output(Map.OutputMode.RECORDS)
+            )))
+            .outputType(Property.ofValue(Map.OutputMode.RECORDS))
             .build();
 
         Map.Output output = task.run(runContext);
@@ -142,9 +150,9 @@ class MapTest {
 
         Map task = Map.builder()
             .from(Property.ofValue(uri.toString()))
-            .fields(java.util.Map.of(
+            .fields(Property.ofValue(java.util.Map.of(
                 "value", Map.FieldDefinition.builder().expr("value").type(IonTypeName.INT).build()
-            ))
+            )))
             .build();
 
         Map.Output output = task.run(runContext);
@@ -164,10 +172,10 @@ class MapTest {
 
         Map task = Map.builder()
             .from(Property.ofValue(List.of(record)))
-            .fields(java.util.Map.of(
+            .fields(Property.ofValue(java.util.Map.of(
                 "value", Map.FieldDefinition.builder().expr("value").type(IonTypeName.INT).build()
-            ))
-            .output(Map.OutputMode.STORE)
+            )))
+            .outputType(Property.ofValue(Map.OutputMode.STORE))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -186,9 +194,9 @@ class MapTest {
     void rejectsMissingStorageUri() {
         Map task = Map.builder()
             .from(Property.ofValue("kestra://missing-file"))
-            .fields(java.util.Map.of(
+            .fields(Property.ofValue(java.util.Map.of(
                 "value", Map.FieldDefinition.builder().expr("value").type(IonTypeName.INT).build()
-            ))
+            )))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -205,9 +213,9 @@ class MapTest {
     void rejectsUnsupportedFromType() {
         Map task = Map.builder()
             .from(Property.ofValue("not-a-uri"))
-            .fields(java.util.Map.of(
+            .fields(Property.ofValue(java.util.Map.of(
                 "value", Map.FieldDefinition.builder().expr("value").type(IonTypeName.INT).build()
-            ))
+            )))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());

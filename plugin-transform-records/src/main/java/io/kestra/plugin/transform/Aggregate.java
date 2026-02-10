@@ -24,6 +24,7 @@ import io.kestra.plugin.transform.util.TransformTaskSupport;
 import io.kestra.plugin.transform.util.TransformException;
 import io.kestra.plugin.transform.util.TransformOptions;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -43,6 +44,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Locale;
 import java.util.UUID;
 
 @SuperBuilder
@@ -52,26 +54,46 @@ import java.util.UUID;
 @NoArgsConstructor
 @Schema(
     title = "Aggregate records",
-    description = "Group records and compute typed aggregates."
+    description = """
+        Group records and compute typed aggregates.
+        """
 )
 @Plugin(
     examples = {
         @io.kestra.core.models.annotations.Example(
             title = "Aggregate totals",
-            code = {
-                "from: \"{{ outputs.normalize.records }}\"",
-                "groupBy:",
-                "  - customer_id",
-                "  - country",
-                "aggregates:",
-                "  order_count:",
-                "    expr: count()",
-                "    type: INT",
-                "  total_spent:",
-                "    expr: sum(total_spent)",
-                "    type: DECIMAL",
-                "onError: FAIL"
-            }
+            full = true,
+            code = """
+                id: aggregate_totals_records
+                namespace: company.team
+
+                tasks:
+                  - id: normalize
+                    type: io.kestra.plugin.core.output.OutputValues
+                    values:
+                      records:
+                        - customer_id: c1
+                          country: FR
+                          total_spent: 10
+                        - customer_id: c1
+                          country: FR
+                          total_spent: 5
+
+                  - id: aggregate
+                    type: io.kestra.plugin.transform.Aggregate
+                    from: "{{ outputs.normalize.values.records }}"
+                    groupBy:
+                      - customer_id
+                      - country
+                    aggregates:
+                      order_count:
+                        expr: count()
+                        type: INT
+                      total_spent:
+                        expr: sum(total_spent)
+                        type: DECIMAL
+                    onError: FAIL
+                """
         ),
         @io.kestra.core.models.annotations.Example(
             title = "Aggregate with stored output",
@@ -95,7 +117,7 @@ import java.util.UUID;
                   - id: aggregate
                     type: io.kestra.plugin.transform.Aggregate
                     from: "{{ outputs.fetch.values.records }}"
-                    output: STORE
+                    outputType: STORE
                     groupBy:
                       - customer_id
                       - country
@@ -116,62 +138,87 @@ import java.util.UUID;
     }
 )
 public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
+    @NotNull
     @Schema(
         title = "Input records",
-        description = "Ion list or struct to transform, or a storage URI pointing to an Ion file."
+        description = """
+        Ion list or struct to transform, or a storage URI pointing to an Ion file.
+        """
     )
     private Property<Object> from;
 
+    @NotNull
     @Schema(
         title = "Group by fields",
-        description = "Fields to group on."
+        description = """
+        Fields to group on.
+        """
     )
     private Property<List<String>> groupBy;
 
+    @NotNull
     @Schema(
         title = "Aggregate definitions",
-        description = "Aggregate expressions with optional types."
+        description = """
+        Aggregate expressions with optional types.
+        """
     )
-    private Map<String, AggregateDefinition> aggregates;
+    private Property<Map<String, AggregateDefinition>> aggregates;
 
     @Builder.Default
-    @Schema(title = "On error behavior")
-    private TransformOptions.OnErrorMode onError = TransformOptions.OnErrorMode.FAIL;
+    @Schema(
+        title = "On error behavior",
+        description = """
+        FAIL stops the task on aggregate errors, SKIP drops failing input records, and NULL sets failing aggregate outputs to null.
+        """
+    )
+    private Property<TransformOptions.OnErrorMode> onError = Property.ofValue(TransformOptions.OnErrorMode.FAIL);
 
     @Builder.Default
     @Schema(
         title = "Output format",
-        description = "Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step."
+        description = """
+        Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step.
+        """
     )
-    private OutputFormat outputFormat = OutputFormat.TEXT;
+    private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
 
     @Schema(
-        title = "Output mode",
-        description = "AUTO stores to internal storage when the input is a storage URI; otherwise it returns records."
+        title = "Output type",
+        description = """
+        AUTO stores to internal storage when the input is a storage URI; otherwise it returns records.
+        """
     )
     @Builder.Default
-    private OutputMode output = OutputMode.AUTO;
+    private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        TransformTaskSupport.ResolvedInput resolvedInput = TransformTaskSupport.resolveInput(runContext, from);
+        if (from == null) {
+            throw new TransformException("from is required");
+        }
+        var resolvedInput = TransformTaskSupport.resolveInput(runContext, from);
+        var rOnError = runContext.render(this.onError).as(TransformOptions.OnErrorMode.class).orElseThrow();
+        var rOutputFormat = runContext.render(this.outputFormat).as(OutputFormat.class).orElseThrow();
+        var rOutputType = runContext.render(this.outputType).as(OutputMode.class).orElseThrow();
 
-        List<String> groupByFields = runContext.render(groupBy).asList(String.class);
+        var groupByFields = runContext.render(groupBy).asList(String.class);
+        var rAggregates = runContext.render(this.aggregates).asMap(String.class, AggregateDefinition.class);
         if (groupByFields == null || groupByFields.isEmpty()) {
             throw new TransformException("groupBy is required");
         }
-        if (aggregates == null || aggregates.isEmpty()) {
+        if (rAggregates == null || rAggregates.isEmpty()) {
             throw new TransformException("aggregates is required");
         }
 
-        List<AggregateMapping> mappings = new ArrayList<>();
-        for (Map.Entry<String, AggregateDefinition> entry : aggregates.entrySet()) {
-            AggregateDefinition definition = entry.getValue();
+        var mappings = new ArrayList<AggregateMapping>();
+        for (Map.Entry<String, AggregateDefinition> entry : rAggregates.entrySet()) {
+            var definition = entry.getValue();
             if (definition == null) {
                 throw new TransformException("Aggregate definition is required for '" + entry.getKey() + "'");
             }
-            String expr = Objects.requireNonNull(definition.expr, "expr is required");
-            AggregateFunction function = parseAggregateFunction(expr);
+            var expr = Objects.requireNonNull(definition.expr, "expr is required");
+            var function = parseAggregateFunction(expr);
             mappings.add(new AggregateMapping(
                 entry.getKey(),
                 function,
@@ -179,24 +226,24 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
             ));
         }
 
-        DefaultExpressionEngine expressionEngine = new DefaultExpressionEngine();
-        DefaultIonCaster caster = new DefaultIonCaster();
-        StatsAccumulator stats = new StatsAccumulator();
+        var expressionEngine = new DefaultExpressionEngine();
+        var caster = new DefaultIonCaster();
+        var stats = new StatsAccumulator();
 
-        Map<GroupKey, GroupBucket> grouped = new LinkedHashMap<>();
+        var grouped = new LinkedHashMap<GroupKey, GroupBucket>();
         if (resolvedInput.fromStorage()) {
-            groupFromStorage(runContext, resolvedInput.storageUri(), groupByFields, mappings, grouped, stats, expressionEngine);
+            groupFromStorage(runContext, resolvedInput.storageUri(), groupByFields, mappings, grouped, stats, expressionEngine, rOnError);
         } else {
-            List<IonStruct> records = TransformTaskSupport.normalizeRecords(resolvedInput.value());
-            groupRecords(records, groupByFields, mappings, grouped, stats, expressionEngine);
+            var records = TransformTaskSupport.normalizeRecords(resolvedInput.value());
+            groupRecords(records, groupByFields, mappings, grouped, stats, expressionEngine, rOnError);
         }
 
-        OutputMode effectiveOutput = output == OutputMode.AUTO
+        var effectiveOutput = rOutputType == OutputMode.AUTO
             ? (resolvedInput.fromStorage() ? OutputMode.STORE : OutputMode.RECORDS)
-            : output;
+            : rOutputType;
 
         if (effectiveOutput == OutputMode.STORE) {
-            URI stored = storeRecords(runContext, grouped, groupByFields, mappings, caster, stats);
+            var stored = storeRecords(runContext, grouped, groupByFields, mappings, caster, stats, rOnError, rOutputFormat);
             runContext.metric(Counter.of("processed", stats.processed))
                 .metric(Counter.of("groups", stats.groups))
                 .metric(Counter.of("failed", stats.failed));
@@ -205,7 +252,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                 .build();
         }
 
-        List<Object> rendered = aggregateToRecords(grouped, groupByFields, mappings, caster, stats);
+        var rendered = aggregateToRecords(grouped, groupByFields, mappings, caster, stats, rOnError);
         runContext.metric(Counter.of("processed", stats.processed))
             .metric(Counter.of("groups", stats.groups))
             .metric(Counter.of("failed", stats.failed));
@@ -218,10 +265,11 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                                             List<String> groupByFields,
                                             List<AggregateMapping> mappings,
                                             DefaultIonCaster caster,
-                                            StatsAccumulator stats) throws TransformException {
+                                            StatsAccumulator stats,
+                                            TransformOptions.OnErrorMode onError) throws TransformException {
         List<Object> outputRecords = new ArrayList<>();
         for (GroupBucket bucket : grouped.values()) {
-            IonStruct output = aggregateBucket(bucket, groupByFields, mappings, caster, stats);
+            IonStruct output = aggregateBucket(bucket, groupByFields, mappings, caster, stats, onError);
             if (output != null) {
                 outputRecords.add(IonValueUtils.toJavaValue(output));
             }
@@ -234,9 +282,10 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                               List<AggregateMapping> mappings,
                               Map<GroupKey, GroupBucket> grouped,
                               StatsAccumulator stats,
-                              DefaultExpressionEngine expressionEngine) throws TransformException {
+                              DefaultExpressionEngine expressionEngine,
+                              TransformOptions.OnErrorMode onError) throws TransformException {
         for (IonStruct record : records) {
-            groupRecord(record, groupByFields, mappings, grouped, stats, expressionEngine);
+            groupRecord(record, groupByFields, mappings, grouped, stats, expressionEngine, onError);
         }
     }
 
@@ -246,17 +295,18 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                                   List<AggregateMapping> mappings,
                                   Map<GroupKey, GroupBucket> grouped,
                                   StatsAccumulator stats,
-                                  DefaultExpressionEngine expressionEngine) throws TransformException {
+                                  DefaultExpressionEngine expressionEngine,
+                                  TransformOptions.OnErrorMode onError) throws TransformException {
         try (InputStream inputStream = runContext.storage().getFile(uri)) {
             Iterator<IonValue> iterator = IonValueUtils.system().iterate(inputStream);
             while (iterator.hasNext()) {
                 IonValue value = iterator.next();
                 if (value instanceof IonList list) {
                     for (IonValue element : list) {
-                        groupStreamRecord(element, groupByFields, mappings, grouped, stats, expressionEngine);
+                        groupStreamRecord(element, groupByFields, mappings, grouped, stats, expressionEngine, onError);
                     }
                 } else {
-                    groupStreamRecord(value, groupByFields, mappings, grouped, stats, expressionEngine);
+                    groupStreamRecord(value, groupByFields, mappings, grouped, stats, expressionEngine, onError);
                 }
             }
         } catch (IOException e) {
@@ -269,11 +319,12 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                                    List<AggregateMapping> mappings,
                                    Map<GroupKey, GroupBucket> grouped,
                                    StatsAccumulator stats,
-                                   DefaultExpressionEngine expressionEngine) throws TransformException {
+                                   DefaultExpressionEngine expressionEngine,
+                                   TransformOptions.OnErrorMode onError) throws TransformException {
         IonStruct record = asStruct(value);
         boolean profile = TransformProfiler.isEnabled();
         long transformStart = profile ? System.nanoTime() : 0L;
-        groupRecord(record, groupByFields, mappings, grouped, stats, expressionEngine);
+        groupRecord(record, groupByFields, mappings, grouped, stats, expressionEngine, onError);
         if (profile) {
             TransformProfiler.addTransformNs(System.nanoTime() - transformStart);
         }
@@ -284,7 +335,9 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                              List<String> groupByFields,
                              List<AggregateMapping> mappings,
                              DefaultIonCaster caster,
-                             StatsAccumulator stats) throws TransformException {
+                             StatsAccumulator stats,
+                             TransformOptions.OnErrorMode onError,
+                             OutputFormat outputFormat) throws TransformException {
         String name = "aggregate-" + UUID.randomUUID() + ".ion";
         try {
             java.nio.file.Path outputPath = runContext.workingDir().createTempFile(".ion");
@@ -293,7 +346,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                  IonWriter writer = TransformTaskSupport.createWriter(outputStream, outputFormat)) {
                 boolean profile = TransformProfiler.isEnabled();
                 for (GroupBucket bucket : grouped.values()) {
-                    IonStruct output = aggregateBucket(bucket, groupByFields, mappings, caster, stats);
+                    IonStruct output = aggregateBucket(bucket, groupByFields, mappings, caster, stats, onError);
                     if (output != null) {
                         long writeStart = profile ? System.nanoTime() : 0L;
                         output.writeTo(writer);
@@ -315,7 +368,8 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                                       List<String> groupByFields,
                                       List<AggregateMapping> mappings,
                                       DefaultIonCaster caster,
-                                      StatsAccumulator stats) throws TransformException {
+                                      StatsAccumulator stats,
+                                      TransformOptions.OnErrorMode onError) throws TransformException {
         if (bucket.skip) {
             return null;
         }
@@ -360,7 +414,8 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                              List<AggregateMapping> mappings,
                              Map<GroupKey, GroupBucket> grouped,
                              StatsAccumulator stats,
-                             DefaultExpressionEngine expressionEngine) throws TransformException {
+                             DefaultExpressionEngine expressionEngine,
+                             TransformOptions.OnErrorMode onError) throws TransformException {
         stats.processed++;
         GroupKey key = buildGroupKey(record, groupByFields);
         GroupBucket bucket = grouped.computeIfAbsent(key, k -> new GroupBucket(record, groupByFields, mappings));
@@ -485,7 +540,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                 if (typeValue instanceof IonTypeName ionTypeName) {
                     type = ionTypeName;
                 } else if (typeValue instanceof String typeString) {
-                    type = IonTypeName.valueOf(typeString);
+                    type = IonTypeName.valueOf(typeString.toUpperCase(Locale.ROOT));
                 }
                 return AggregateDefinition.builder()
                     .expr(exprValue == null ? null : String.valueOf(exprValue))
@@ -499,7 +554,16 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
     public enum OutputMode {
         AUTO,
         RECORDS,
-        STORE
+        STORE;
+
+        @JsonCreator
+        public static OutputMode from(Object value) {
+            if (value == null) {
+                return null;
+            }
+            String raw = String.valueOf(value).trim();
+            return OutputMode.valueOf(raw.toUpperCase(Locale.ROOT));
+        }
     }
 
     private record AggregateMapping(String targetField, AggregateFunction function, IonTypeName type) {
@@ -752,13 +816,17 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
             title = "Stored Ion file URI",
-            description = "URI to the stored Ion file when output mode is STORE or AUTO resolves to STORE."
+            description = """
+        URI to the stored Ion file when output mode is STORE or AUTO resolves to STORE.
+        """
         )
         private final String uri;
 
         @Schema(
             title = "Aggregated records",
-            description = "JSON-safe records when output mode is RECORDS or AUTO resolves to RECORDS."
+            description = """
+        JSON-safe records when output mode is RECORDS or AUTO resolves to RECORDS.
+        """
         )
         private final List<Object> records;
     }

@@ -12,18 +12,18 @@ tasks:
     from: "{{ outputs.download.uri }}"
     path: products[]
     as: product
-    output: RECORDS
+    outputType: RECORDS
 
   - id: filter
     type: io.kestra.plugin.transform.Filter
     from: "{{ outputs.explode.records }}"
     where: product.price > 10
-    output: RECORDS
+    outputType: RECORDS
 
   - id: map
     type: io.kestra.plugin.transform.Map
     from: "{{ outputs.filter.records }}"
-    output: STORE
+    outputType: STORE
 
     fields:
       id:

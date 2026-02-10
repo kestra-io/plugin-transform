@@ -38,4 +38,4 @@ tasks:
         expr: missing
         optional: true
     dropNulls: true
-    output: RECORDS
+    outputType: RECORDS
