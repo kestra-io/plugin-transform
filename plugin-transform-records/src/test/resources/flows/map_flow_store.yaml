@@ -12,7 +12,7 @@ tasks:
   - id: map
     type: io.kestra.plugin.transform.Map
     from: "{{ outputs.fetch.values.records }}"
-    output: STORE
+    outputType: STORE
     fields:
       value:
         expr: value

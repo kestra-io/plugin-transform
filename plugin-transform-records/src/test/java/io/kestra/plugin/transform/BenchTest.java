@@ -347,12 +347,12 @@ class BenchTest {
     private void runMap(RunContext runContext, String uri, io.kestra.plugin.transform.util.OutputFormat outputFormat) throws Exception {
         io.kestra.plugin.transform.Map task = io.kestra.plugin.transform.Map.builder()
             .from(Property.ofValue(uri))
-            .output(io.kestra.plugin.transform.Map.OutputMode.STORE)
-            .outputFormat(outputFormat)
-            .fields(Map.of(
+            .outputType(Property.ofValue(io.kestra.plugin.transform.Map.OutputMode.STORE))
+            .outputFormat(Property.ofValue(outputFormat))
+            .fields(Property.ofValue(Map.of(
                 "customer_id", io.kestra.plugin.transform.Map.FieldDefinition.builder().expr("customer_id").type(IonTypeName.STRING).build(),
                 "total_spent", io.kestra.plugin.transform.Map.FieldDefinition.builder().expr("total_spent").type(IonTypeName.DECIMAL).build()
-            ))
+            )))
             .build();
         task.run(runContext);
     }
@@ -414,8 +414,8 @@ class BenchTest {
     private void runUnnest(RunContext runContext, String uri, io.kestra.plugin.transform.util.OutputFormat outputFormat) throws Exception {
         Unnest task = Unnest.builder()
             .from(Property.ofValue(uri))
-            .output(Unnest.OutputMode.STORE)
-            .outputFormat(outputFormat)
+            .outputType(Property.ofValue(Unnest.OutputMode.STORE))
+            .outputFormat(Property.ofValue(outputFormat))
             .path(Property.ofValue("items[]"))
             .as(Property.ofValue("item"))
             .build();
@@ -425,8 +425,8 @@ class BenchTest {
     private void runFilter(RunContext runContext, String uri, io.kestra.plugin.transform.util.OutputFormat outputFormat) throws Exception {
         Filter task = Filter.builder()
             .from(Property.ofValue(uri))
-            .output(Filter.OutputMode.STORE)
-            .outputFormat(outputFormat)
+            .outputType(Property.ofValue(Filter.OutputMode.STORE))
+            .outputFormat(Property.ofValue(outputFormat))
             .where(Property.ofValue("active"))
             .build();
         task.run(runContext);
@@ -435,13 +435,13 @@ class BenchTest {
     private void runAggregate(RunContext runContext, String uri, io.kestra.plugin.transform.util.OutputFormat outputFormat) throws Exception {
         Aggregate task = Aggregate.builder()
             .from(Property.ofValue(uri))
-            .output(Aggregate.OutputMode.STORE)
-            .outputFormat(outputFormat)
+            .outputType(Property.ofValue(Aggregate.OutputMode.STORE))
+            .outputFormat(Property.ofValue(outputFormat))
             .groupBy(Property.ofValue(List.of("customer_id")))
-            .aggregates(Map.of(
+            .aggregates(Property.ofValue(Map.of(
                 "order_count", Aggregate.AggregateDefinition.builder().expr("count()").type(IonTypeName.INT).build(),
                 "total_spent", Aggregate.AggregateDefinition.builder().expr("sum(total_spent)").type(IonTypeName.DECIMAL).build()
-            ))
+            )))
             .build();
         task.run(runContext);
     }
@@ -452,9 +452,9 @@ class BenchTest {
                 Property.ofValue(uri),
                 Property.ofValue(uri)
             ))
-            .onConflict(Zip.ConflictMode.RIGHT)
-            .output(Zip.OutputMode.STORE)
-            .outputFormat(outputFormat)
+            .onConflict(Property.ofValue(Zip.ConflictMode.RIGHT))
+            .outputType(Property.ofValue(Zip.OutputMode.STORE))
+            .outputFormat(Property.ofValue(outputFormat))
             .build();
         task.run(runContext);
     }
@@ -465,8 +465,8 @@ class BenchTest {
                 Property.ofValue(uri),
                 Property.ofValue(uri)
             ))
-            .output(Select.OutputMode.STORE)
-            .outputFormat(outputFormat)
+            .outputType(Property.ofValue(Select.OutputMode.STORE))
+            .outputFormat(Property.ofValue(outputFormat))
             .build();
         task.run(runContext);
     }
@@ -475,8 +475,8 @@ class BenchTest {
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(uri)))
             .where(Property.ofValue("active"))
-            .output(Select.OutputMode.STORE)
-            .outputFormat(outputFormat)
+            .outputType(Property.ofValue(Select.OutputMode.STORE))
+            .outputFormat(Property.ofValue(outputFormat))
             .build();
         task.run(runContext);
     }
@@ -484,12 +484,12 @@ class BenchTest {
     private void runSelectMapOnly(RunContext runContext, String uri, io.kestra.plugin.transform.util.OutputFormat outputFormat) throws Exception {
         Select task = Select.builder()
             .inputs(List.of(Property.ofValue(uri)))
-            .fields(Map.of(
+            .fields(Property.ofValue(Map.of(
                 "customer_id", Select.FieldDefinition.builder().expr("customer_id").type(IonTypeName.STRING).build(),
                 "total_spent", Select.FieldDefinition.builder().expr("total_spent").type(IonTypeName.DECIMAL).build()
-            ))
-            .output(Select.OutputMode.STORE)
-            .outputFormat(outputFormat)
+            )))
+            .outputType(Property.ofValue(Select.OutputMode.STORE))
+            .outputFormat(Property.ofValue(outputFormat))
             .build();
         task.run(runContext);
     }
@@ -501,12 +501,12 @@ class BenchTest {
                 Property.ofValue(uri)
             ))
             .where(Property.ofValue("$1.active && $2.active"))
-            .fields(Map.of(
+            .fields(Property.ofValue(Map.of(
                 "customer_id", Select.FieldDefinition.builder().expr("customer_id").type(IonTypeName.STRING).build(),
                 "total_spent", Select.FieldDefinition.builder().expr("total_spent").type(IonTypeName.DECIMAL).build()
-            ))
-            .output(Select.OutputMode.STORE)
-            .outputFormat(outputFormat)
+            )))
+            .outputType(Property.ofValue(Select.OutputMode.STORE))
+            .outputFormat(Property.ofValue(outputFormat))
             .build();
         task.run(runContext);
     }
@@ -517,28 +517,28 @@ class BenchTest {
                 Property.ofValue(uri),
                 Property.ofValue(uri)
             ))
-            .onConflict(Zip.ConflictMode.RIGHT)
-            .output(Zip.OutputMode.STORE)
-            .outputFormat(outputFormat)
+            .onConflict(Property.ofValue(Zip.ConflictMode.RIGHT))
+            .outputType(Property.ofValue(Zip.OutputMode.STORE))
+            .outputFormat(Property.ofValue(outputFormat))
             .build();
         Zip.Output zipped = zip.run(runContext);
 
         Filter filter = Filter.builder()
             .from(Property.ofValue(zipped.getUri()))
             .where(Property.ofValue("active"))
-            .output(Filter.OutputMode.STORE)
-            .outputFormat(outputFormat)
+            .outputType(Property.ofValue(Filter.OutputMode.STORE))
+            .outputFormat(Property.ofValue(outputFormat))
             .build();
         Filter.Output filtered = filter.run(runContext);
 
         io.kestra.plugin.transform.Map map = io.kestra.plugin.transform.Map.builder()
             .from(Property.ofValue(filtered.getUri()))
-            .output(io.kestra.plugin.transform.Map.OutputMode.STORE)
-            .outputFormat(outputFormat)
-            .fields(Map.of(
+            .outputType(Property.ofValue(io.kestra.plugin.transform.Map.OutputMode.STORE))
+            .outputFormat(Property.ofValue(outputFormat))
+            .fields(Property.ofValue(Map.of(
                 "customer_id", io.kestra.plugin.transform.Map.FieldDefinition.builder().expr("customer_id").type(IonTypeName.STRING).build(),
                 "total_spent", io.kestra.plugin.transform.Map.FieldDefinition.builder().expr("total_spent").type(IonTypeName.DECIMAL).build()
-            ))
+            )))
             .build();
         map.run(runContext);
     }

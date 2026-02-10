@@ -11,12 +11,12 @@ tasks:
     from: "{{ outputs.download_users.uri }}"
     path: users[]
     as: user
-    output: RECORDS
+    outputType: RECORDS
 
   - id: project_users
     type: io.kestra.plugin.transform.Map
     from: "{{ outputs.explode_users.records }}"
-    output: STORE
+    outputType: STORE
     fields:
       id:
         expr: user.id
@@ -41,4 +41,4 @@ tasks:
     type: io.kestra.plugin.transform.Filter
     from: "{{ outputs.project_users.uri }}"
     where: age >= 40 && country == "United States"
-    output: RECORDS
+    outputType: RECORDS

@@ -27,6 +27,7 @@ import io.kestra.plugin.transform.util.TransformTaskSupport;
 import io.kestra.plugin.transform.util.TransformException;
 import io.kestra.plugin.transform.util.TransformOptions;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -42,6 +43,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.UUID;
@@ -53,27 +55,46 @@ import java.util.UUID;
 @NoArgsConstructor
 @Schema(
     title = "Typed record mapping",
-    description = "Declaratively map, cast, and derive Ion fields without scripts."
+    description = """
+        Declaratively map, cast, and derive Ion fields without scripts.
+        """
 )
 @Plugin(
     examples = {
         @io.kestra.core.models.annotations.Example(
             title = "Normalize records",
-            code = {
-                "from: \"{{ outputs.fetch.records }}\"",
-                "fields:",
-                "  customer_id:",
-                "    expr: user.id",
-                "    type: STRING",
-                "  created_at:",
-                "    expr: createdAt",
-                "    type: TIMESTAMP",
-                "  total:",
-                "    expr: sum(items[].price)",
-                "    type: DECIMAL",
-                "dropNulls: true",
-                "onError: SKIP"
-            }
+            full = true,
+            code = """
+                id: map_normalize_records
+                namespace: company.team
+
+                tasks:
+                  - id: fetch
+                    type: io.kestra.plugin.core.output.OutputValues
+                    values:
+                      records:
+                        - user:
+                            id: c1
+                          createdAt: "2026-01-01T00:00:00Z"
+                          items:
+                            - price: 10.5
+
+                  - id: map
+                    type: io.kestra.plugin.transform.Map
+                    from: "{{ outputs.fetch.values.records }}"
+                    fields:
+                      customer_id:
+                        expr: user.id
+                        type: STRING
+                      created_at:
+                        expr: createdAt
+                        type: TIMESTAMP
+                      total:
+                        expr: sum(items[].price)
+                        type: DECIMAL
+                    dropNulls: true
+                    onError: SKIP
+                """
         ),
         @io.kestra.core.models.annotations.Example(
             title = "Map DuckDB stored results",
@@ -91,7 +112,7 @@ import java.util.UUID;
                   - id: map
                     type: io.kestra.plugin.transform.Map
                     from: "{{ outputs.query1.uri }}"
-                    output: RECORDS
+                    outputType: RECORDS
                     fields:
                       ts:
                         expr: ts
@@ -135,7 +156,7 @@ import java.util.UUID;
                   - id: map
                     type: io.kestra.plugin.transform.Map
                     from: "{{ outputs.download.uri }}"
-                    output: RECORDS
+                    outputType: RECORDS
                     fields:
                       first_title:
                         expr: products[0].title
@@ -150,83 +171,112 @@ import java.util.UUID;
     }
 )
 public class Map extends Task implements RunnableTask<Map.Output> {
+    @NotNull
     @Schema(
         title = "Input records",
-        description = "Ion list or struct to transform, or a storage URI pointing to an Ion file."
+        description = """
+        Ion list or struct to transform, or a storage URI pointing to an Ion file.
+        """
     )
     private Property<Object> from;
 
+    @NotNull
     @Schema(
         title = "Field mappings",
-        description = "Target fields with expressions and types."
+        description = """
+        Target fields with expressions and types.
+        """
     )
-    private java.util.Map<String, FieldDefinition> fields;
+    private Property<java.util.Map<String, FieldDefinition>> fields;
 
     @Builder.Default
     @Schema(
         title = "Keep original fields",
-        description = "Keeps input fields not explicitly mapped. If you map a_new: a, the original a is still kept."
+        description = """
+        Keeps input fields not explicitly mapped. If you map a_new: a, the original a is still kept.
+        """
     )
-    private boolean keepOriginalFields = false;
+    private Property<Boolean> keepOriginalFields = Property.ofValue(false);
 
     @Builder.Default
     @Schema(title = "Drop null fields")
-    private boolean dropNulls = true;
+    private Property<Boolean> dropNulls = Property.ofValue(true);
 
     @Builder.Default
-    @Schema(title = "On error behavior")
-    private TransformOptions.OnErrorMode onError = TransformOptions.OnErrorMode.FAIL;
+    @Schema(
+        title = "On error behavior",
+        description = """
+        FAIL stops the task on the first field error, SKIP drops the current record, and NULL writes null for failing fields.
+        """
+    )
+    private Property<TransformOptions.OnErrorMode> onError = Property.ofValue(TransformOptions.OnErrorMode.FAIL);
 
     @Builder.Default
     @Schema(
         title = "Output format",
-        description = "Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step."
+        description = """
+        Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step.
+        """
     )
-    private OutputFormat outputFormat = OutputFormat.TEXT;
+    private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
 
     @Schema(
-        title = "Output mode",
-        description = "AUTO stores to internal storage when the input is a storage URI; otherwise it returns records."
+        title = "Output type",
+        description = """
+        AUTO stores to internal storage when the input is a storage URI; otherwise it returns records.
+        """
     )
     @Builder.Default
-    private OutputMode output = OutputMode.AUTO;
+    private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        TransformTaskSupport.ResolvedInput resolvedInput = TransformTaskSupport.resolveInput(runContext, from);
-
-        List<FieldMapping> mappings = new ArrayList<>();
-        if (fields != null) {
-            for (Entry<String, FieldDefinition> entry : fields.entrySet()) {
-                FieldDefinition definition = entry.getValue();
-                if (definition == null) {
-                    throw new TransformException("Field definition is required for '" + entry.getKey() + "'");
-                }
-                mappings.add(new FieldMapping(
-                    entry.getKey(),
-                    Objects.requireNonNull(definition.expr, "expr is required"),
-                    definition.type,
-                    definition.optional
-                ));
-            }
+        if (from == null) {
+            throw new TransformException("from is required");
         }
 
-        TransformOptions transformOptions = new TransformOptions(keepOriginalFields, dropNulls, onError);
-        DefaultRecordTransformer transformer = new DefaultRecordTransformer(
+        var resolvedInput = TransformTaskSupport.resolveInput(runContext, from);
+        var rFields = runContext.render(this.fields).asMap(String.class, FieldDefinition.class);
+        if (rFields == null || rFields.isEmpty()) {
+            throw new TransformException("fields is required");
+        }
+        var rOnError = runContext.render(this.onError).as(TransformOptions.OnErrorMode.class).orElseThrow();
+        var rOutputFormat = runContext.render(this.outputFormat).as(OutputFormat.class).orElseThrow();
+        var rOutputType = runContext.render(this.outputType).as(OutputMode.class).orElseThrow();
+        var rKeepOriginalFields = runContext.render(this.keepOriginalFields).as(Boolean.class).orElse(false);
+        var rDropNulls = runContext.render(this.dropNulls).as(Boolean.class).orElse(true);
+
+        var mappings = new ArrayList<FieldMapping>();
+        for (Entry<String, FieldDefinition> entry : rFields.entrySet()) {
+            var definition = entry.getValue();
+            if (definition == null) {
+                throw new TransformException("Field definition is required for '" + entry.getKey() + "'");
+            }
+            mappings.add(new FieldMapping(
+                entry.getKey(),
+                Objects.requireNonNull(definition.expr, "expr is required"),
+                definition.type,
+                definition.optional
+            ));
+        }
+
+        var transformOptions = new TransformOptions(rKeepOriginalFields, rDropNulls, rOnError);
+        var transformer = new DefaultRecordTransformer(
             mappings,
             new DefaultExpressionEngine(),
             new DefaultIonCaster(),
             transformOptions
         );
-        OutputMode effectiveOutput = output == OutputMode.AUTO
+        var effectiveOutput = rOutputType == OutputMode.AUTO
             ? (resolvedInput.fromStorage() ? OutputMode.STORE : OutputMode.RECORDS)
-            : output;
+            : rOutputType;
 
         if (resolvedInput.fromStorage() && effectiveOutput == OutputMode.STORE) {
-            StreamResult streamResult = transformStreamToStorage(
+            var streamResult = transformStreamToStorage(
                 runContext,
                 resolvedInput.storageUri(),
-                transformer
+                transformer,
+                rOutputFormat
             );
             runContext.metric(Counter.of("processed", streamResult.stats().processed()))
                 .metric(Counter.of("failed", streamResult.stats().failed()))
@@ -236,22 +286,22 @@ public class Map extends Task implements RunnableTask<Map.Output> {
                 .build();
         }
 
-        List<IonStruct> records = TransformTaskSupport.normalizeRecords(resolveInMemory(runContext, resolvedInput));
-        DefaultTransformTaskEngine engine = new DefaultTransformTaskEngine(transformer);
-        TransformResult result = engine.execute(records);
+        var records = TransformTaskSupport.normalizeRecords(resolveInMemory(runContext, resolvedInput));
+        var engine = new DefaultTransformTaskEngine(transformer);
+        var result = engine.execute(records);
 
         runContext.metric(Counter.of("processed", result.stats().processed()))
             .metric(Counter.of("failed", result.stats().failed()))
             .metric(Counter.of("dropped", result.stats().dropped()));
 
         if (effectiveOutput == OutputMode.STORE) {
-            URI storedUri = storeRecords(runContext, result.records());
+            var storedUri = storeRecords(runContext, result.records(), rOutputFormat);
             return Output.builder()
                 .uri(storedUri.toString())
                 .build();
         }
 
-        List<Object> renderedRecords = new ArrayList<>();
+        var renderedRecords = new ArrayList<>();
         for (IonStruct record : result.records()) {
             renderedRecords.add(IonValueUtils.toJavaValue(record));
         }
@@ -270,7 +320,8 @@ public class Map extends Task implements RunnableTask<Map.Output> {
 
     private StreamResult transformStreamToStorage(RunContext runContext,
                                                   URI uri,
-                                                  DefaultRecordTransformer transformer) throws TransformException {
+                                                  DefaultRecordTransformer transformer,
+                                                  OutputFormat outputFormat) throws TransformException {
         String name = "transform-" + UUID.randomUUID() + ".ion";
         java.util.Map<String, String> fieldErrors = new java.util.HashMap<>();
         int processed = 0;
@@ -294,7 +345,7 @@ public class Map extends Task implements RunnableTask<Map.Output> {
                     IonValue value = iterator.next();
                     if (value instanceof IonList list) {
                         for (IonValue element : list) {
-                            StreamCounters counters = processStreamRecord(element, transformer, writer, outputStream, fieldErrors, index);
+                            StreamCounters counters = processStreamRecord(element, transformer, writer, outputStream, fieldErrors, index, outputFormat);
                             processed++;
                             if (counters.failed) {
                                 failed++;
@@ -305,7 +356,7 @@ public class Map extends Task implements RunnableTask<Map.Output> {
                             index = counters.nextIndex;
                         }
                     } else {
-                        StreamCounters counters = processStreamRecord(value, transformer, writer, outputStream, fieldErrors, index);
+                        StreamCounters counters = processStreamRecord(value, transformer, writer, outputStream, fieldErrors, index, outputFormat);
                         processed++;
                         if (counters.failed) {
                             failed++;
@@ -333,7 +384,8 @@ public class Map extends Task implements RunnableTask<Map.Output> {
                                                IonWriter writer,
                                                OutputStream outputStream,
                                                java.util.Map<String, String> fieldErrors,
-                                               int index) throws TransformException, IOException {
+                                               int index,
+                                               OutputFormat outputFormat) throws TransformException, IOException {
         IonStruct record = asStruct(value);
         boolean profile = TransformProfiler.isEnabled();
         long transformStart = profile ? System.nanoTime() : 0L;
@@ -366,7 +418,7 @@ public class Map extends Task implements RunnableTask<Map.Output> {
     private record StreamResult(TransformStats stats, URI uri) {
     }
 
-    private URI storeRecords(RunContext runContext, List<IonStruct> records) throws TransformException {
+    private URI storeRecords(RunContext runContext, List<IonStruct> records, OutputFormat outputFormat) throws TransformException {
         String name = "transform-" + UUID.randomUUID() + ".ion";
         try {
             java.nio.file.Path outputPath = runContext.workingDir().createTempFile(".ion");
@@ -432,7 +484,7 @@ public class Map extends Task implements RunnableTask<Map.Output> {
                 if (typeValue instanceof IonTypeName ionTypeName) {
                     type = ionTypeName;
                 } else if (typeValue instanceof String typeString) {
-                    type = IonTypeName.valueOf(typeString);
+                    type = IonTypeName.valueOf(typeString.toUpperCase(Locale.ROOT));
                 }
                 boolean optional = optionalValue instanceof Boolean bool ? bool : false;
                 return FieldDefinition.builder()
@@ -449,7 +501,16 @@ public class Map extends Task implements RunnableTask<Map.Output> {
     public enum OutputMode {
         AUTO,
         RECORDS,
-        STORE
+        STORE;
+
+        @JsonCreator
+        public static OutputMode from(Object value) {
+            if (value == null) {
+                return null;
+            }
+            String raw = String.valueOf(value).trim();
+            return OutputMode.valueOf(raw.toUpperCase(Locale.ROOT));
+        }
     }
 
     @Builder
@@ -457,13 +518,17 @@ public class Map extends Task implements RunnableTask<Map.Output> {
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
             title = "Stored Ion file URI",
-            description = "URI to the stored Ion file when output mode is STORE or AUTO resolves to STORE."
+            description = """
+        URI to the stored Ion file when output mode is STORE or AUTO resolves to STORE.
+        """
         )
         private final String uri;
 
         @Schema(
             title = "Transformed records",
-            description = "JSON-safe records when output mode is RECORDS or AUTO resolves to RECORDS."
+            description = """
+        JSON-safe records when output mode is RECORDS or AUTO resolves to RECORDS.
+        """
         )
         private final List<Object> records;
     }

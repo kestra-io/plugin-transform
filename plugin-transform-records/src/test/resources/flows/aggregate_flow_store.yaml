@@ -20,4 +20,4 @@ tasks:
       total_spent:
         expr: sum(total_spent)
         type: DECIMAL
-    output: STORE
+    outputType: STORE

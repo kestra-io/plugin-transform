@@ -43,10 +43,10 @@ class AggregateTest {
         Aggregate task = Aggregate.builder()
             .from(Property.ofValue(List.of(first, second, third)))
             .groupBy(Property.ofValue(List.of("customer_id", "country")))
-            .aggregates(java.util.Map.of(
+            .aggregates(Property.ofValue(java.util.Map.of(
                 "order_count", Aggregate.AggregateDefinition.builder().expr("count()").type(IonTypeName.INT).build(),
                 "total_spent", Aggregate.AggregateDefinition.builder().expr("sum(total_spent)").type(IonTypeName.DECIMAL).build()
-            ))
+            )))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -66,10 +66,10 @@ class AggregateTest {
         Aggregate task = Aggregate.builder()
             .from(Property.ofValue(List.of(record)))
             .groupBy(Property.ofValue(List.of("customer_id")))
-            .aggregates(java.util.Map.of(
+            .aggregates(Property.ofValue(java.util.Map.of(
                 "total_spent", Aggregate.AggregateDefinition.builder().expr("sum(total_spent)").type(IonTypeName.DECIMAL).build()
-            ))
-            .onError(TransformOptions.OnErrorMode.NULL)
+            )))
+            .onError(Property.ofValue(TransformOptions.OnErrorMode.NULL))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -93,12 +93,12 @@ class AggregateTest {
         Aggregate task = Aggregate.builder()
             .from(Property.ofValue(List.of(first, second)))
             .groupBy(Property.ofValue(List.of("customer_id")))
-            .aggregates(java.util.Map.of(
+            .aggregates(Property.ofValue(java.util.Map.of(
                 "last_order_at", Aggregate.AggregateDefinition.builder()
                     .expr("max(parseTimestamp(created_at))")
                     .type(IonTypeName.TIMESTAMP)
                     .build()
-            ))
+            )))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -112,9 +112,9 @@ class AggregateTest {
     void rejectsMissingGroupBy() {
         Aggregate task = Aggregate.builder()
             .from(Property.ofValue(List.of()))
-            .aggregates(java.util.Map.of(
+            .aggregates(Property.ofValue(java.util.Map.of(
                 "order_count", Aggregate.AggregateDefinition.builder().expr("count()").build()
-            ))
+            )))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -125,5 +125,13 @@ class AggregateTest {
         );
 
         assertThat(exception.getMessage(), is("groupBy is required"));
+    }
+
+    @Test
+    void outputModeUriIsRejected() {
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> Aggregate.OutputMode.from("URI")
+        );
     }
 }

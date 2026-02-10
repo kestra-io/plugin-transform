@@ -28,12 +28,12 @@ tasks:
       b:
         expr: $2.b
         type: INT
-    output: STORE
+    outputType: STORE
 
   - id: read_back
     type: io.kestra.plugin.transform.Map
     from: "{{ outputs.select.uri }}"
-    output: RECORDS
+    outputType: RECORDS
     fields:
       a:
         expr: a

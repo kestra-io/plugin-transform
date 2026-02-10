@@ -75,7 +75,7 @@ Example: enrich orders with scores and output typed columns
     score:
       expr: $2.score
       type: DECIMAL
-  output: RECORDS
+  outputType: RECORDS
 ```
 
 ### Map

@@ -4,6 +4,7 @@ import com.amazon.ion.IonList;
 import com.amazon.ion.IonStruct;
 import com.amazon.ion.IonValue;
 import com.amazon.ion.IonWriter;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.executions.metrics.Counter;
@@ -21,6 +22,7 @@ import io.kestra.plugin.transform.util.TransformTaskSupport;
 import io.kestra.plugin.transform.util.TransformException;
 import io.kestra.plugin.transform.util.TransformOptions;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -36,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -46,19 +49,37 @@ import java.util.UUID;
 @NoArgsConstructor
 @Schema(
     title = "Explode records",
-    description = "Expand array fields into multiple records without scripts."
+    description = """
+        Expand array fields into multiple records without scripts.
+        """
 )
 @Plugin(
     examples = {
         @io.kestra.core.models.annotations.Example(
             title = "Explode items into rows",
-            code = {
-                "from: \"{{ outputs.fetch.records }}\"",
-                "path: items[]",
-                "as: item",
-                "keepOriginalFields: true",
-                "onError: FAIL"
-            }
+            full = true,
+            code = """
+                id: unnest_items
+                namespace: company.team
+
+                tasks:
+                  - id: fetch
+                    type: io.kestra.plugin.core.output.OutputValues
+                    values:
+                      records:
+                        - order_id: o1
+                          items:
+                            - sku: a
+                            - sku: b
+
+                  - id: unnest
+                    type: io.kestra.plugin.transform.Unnest
+                    from: "{{ outputs.fetch.values.records }}"
+                    path: items[]
+                    as: item
+                    keepOriginalFields: true
+                    onError: FAIL
+                """
         )
     },
     metrics = {
@@ -68,80 +89,110 @@ import java.util.UUID;
     }
 )
 public class Unnest extends Task implements RunnableTask<Unnest.Output> {
+    @NotNull
     @Schema(
         title = "Input records",
-        description = "Ion list or struct to transform, or a storage URI pointing to an Ion file."
+        description = """
+        Ion list or struct to transform, or a storage URI pointing to an Ion file.
+        """
     )
     private Property<Object> from;
 
+    @NotNull
     @Schema(
         title = "Array path",
-        description = "Path expression to the array to explode (e.g., items[])."
+        description = """
+        Path expression to the array to explode (e.g., items[]).
+        """
     )
     private Property<String> path;
 
+    @NotNull
     @Schema(
         title = "Output field name",
-        description = "Field name that holds the exploded element."
+        description = """
+        Field name that holds the exploded element.
+        """
     )
     private Property<String> as;
 
     @Builder.Default
     @Schema(
         title = "Keep original fields",
-        description = "Keeps original fields other than the exploded array field."
+        description = """
+        Keeps original fields other than the exploded array field.
+        """
     )
-    private boolean keepOriginalFields = true;
+    private Property<Boolean> keepOriginalFields = Property.ofValue(true);
 
     @Builder.Default
-    @Schema(title = "On error behavior")
-    private TransformOptions.OnErrorMode onError = TransformOptions.OnErrorMode.FAIL;
+    @Schema(
+        title = "On error behavior",
+        description = """
+        FAIL stops the task on unnest errors, SKIP drops the current record, and NULL emits the record with a null exploded field.
+        """
+    )
+    private Property<TransformOptions.OnErrorMode> onError = Property.ofValue(TransformOptions.OnErrorMode.FAIL);
 
     @Builder.Default
     @Schema(
         title = "Output format",
-        description = "Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step."
+        description = """
+        Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step.
+        """
     )
-    private OutputFormat outputFormat = OutputFormat.TEXT;
+    private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
 
     @Schema(
-        title = "Output mode",
-        description = "AUTO stores to internal storage when the input is a storage URI; otherwise it returns records."
+        title = "Output type",
+        description = """
+        AUTO stores to internal storage when the input is a storage URI; otherwise it returns records.
+        """
     )
     @Builder.Default
-    private OutputMode output = OutputMode.AUTO;
+    private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        TransformTaskSupport.ResolvedInput resolvedInput = TransformTaskSupport.resolveInput(runContext, from);
+        if (from == null) {
+            throw new TransformException("from is required");
+        }
+        var resolvedInput = TransformTaskSupport.resolveInput(runContext, from);
+        var rOnError = runContext.render(this.onError).as(TransformOptions.OnErrorMode.class).orElseThrow();
+        var rOutputFormat = runContext.render(this.outputFormat).as(OutputFormat.class).orElseThrow();
+        var rOutputType = runContext.render(this.outputType).as(OutputMode.class).orElseThrow();
+        var rKeepOriginalFields = runContext.render(this.keepOriginalFields).as(Boolean.class).orElse(true);
 
-        String pathExpr = runContext.render(path).as(String.class).orElse(null);
+        var pathExpr = runContext.render(path).as(String.class).orElse(null);
         if (pathExpr == null || pathExpr.isBlank()) {
             throw new TransformException("path is required");
         }
-        String asField = runContext.render(as).as(String.class).orElse(null);
+        var asField = runContext.render(as).as(String.class).orElse(null);
         if (asField == null || asField.isBlank()) {
             throw new TransformException("as is required");
         }
 
-        DefaultExpressionEngine expressionEngine = new DefaultExpressionEngine();
-        StatsAccumulator stats = new StatsAccumulator();
+        var expressionEngine = new DefaultExpressionEngine();
+        var stats = new StatsAccumulator();
 
-        OutputMode effectiveOutput = output == OutputMode.AUTO
+        var effectiveOutput = rOutputType == OutputMode.AUTO
             ? (resolvedInput.fromStorage() ? OutputMode.STORE : OutputMode.RECORDS)
-            : output;
+            : rOutputType;
 
-        List<String> pathSegments = parsePathSegments(pathExpr);
+        var pathSegments = parsePathSegments(pathExpr);
 
         if (resolvedInput.fromStorage() && effectiveOutput == OutputMode.STORE) {
-            URI storedUri = unnestStreamToStorage(
+            var storedUri = unnestStreamToStorage(
                 runContext,
                 resolvedInput.storageUri(),
                 pathExpr,
                 asField,
                 pathSegments,
                 expressionEngine,
-                stats
+                stats,
+                rOnError,
+                rOutputFormat,
+                rKeepOriginalFields
             );
             runContext.metric(Counter.of("processed", stats.processed))
                 .metric(Counter.of("failed", stats.failed))
@@ -151,16 +202,19 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
                 .build();
         }
 
-        List<IonStruct> records = TransformTaskSupport.normalizeRecords(resolveInMemory(runContext, resolvedInput));
+        var records = TransformTaskSupport.normalizeRecords(resolveInMemory(runContext, resolvedInput));
         if (effectiveOutput == OutputMode.STORE) {
-            URI storedUri = storeRecords(
+            var storedUri = storeRecords(
                 runContext,
                 records,
                 pathExpr,
                 asField,
                 pathSegments,
                 expressionEngine,
-                stats
+                stats,
+                rOnError,
+                rOutputFormat,
+                rKeepOriginalFields
             );
             runContext.metric(Counter.of("processed", stats.processed))
                 .metric(Counter.of("failed", stats.failed))
@@ -170,7 +224,7 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
                 .build();
         }
 
-        List<Object> rendered = expandToRecords(records, pathExpr, asField, pathSegments, expressionEngine, stats);
+        var rendered = expandToRecords(records, pathExpr, asField, pathSegments, expressionEngine, stats, rOnError, rKeepOriginalFields);
         runContext.metric(Counter.of("processed", stats.processed))
             .metric(Counter.of("failed", stats.failed))
             .metric(Counter.of("dropped", stats.dropped));
@@ -191,7 +245,9 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
                                          String asField,
                                          List<String> pathSegments,
                                          DefaultExpressionEngine expressionEngine,
-                                         StatsAccumulator stats) throws TransformException {
+                                         StatsAccumulator stats,
+                                         TransformOptions.OnErrorMode onError,
+                                         boolean keepOriginalFields) throws TransformException {
         List<Object> outputRecords = new ArrayList<>();
         for (int i = 0; i < records.size(); i++) {
             IonStruct record = records.get(i);
@@ -235,7 +291,10 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
                              String asField,
                              List<String> pathSegments,
                              DefaultExpressionEngine expressionEngine,
-                             StatsAccumulator stats) throws TransformException {
+                             StatsAccumulator stats,
+                             TransformOptions.OnErrorMode onError,
+                             OutputFormat outputFormat,
+                             boolean keepOriginalFields) throws TransformException {
         String name = "unnest-" + UUID.randomUUID() + ".ion";
         try {
             java.nio.file.Path outputPath = runContext.workingDir().createTempFile(".ion");
@@ -312,7 +371,10 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
                                       String asField,
                                       List<String> pathSegments,
                                       DefaultExpressionEngine expressionEngine,
-                                      StatsAccumulator stats) throws TransformException {
+                                      StatsAccumulator stats,
+                                      TransformOptions.OnErrorMode onError,
+                                      OutputFormat outputFormat,
+                                      boolean keepOriginalFields) throws TransformException {
         String name = "unnest-" + UUID.randomUUID() + ".ion";
         InputStream inputStream;
         try {
@@ -343,7 +405,10 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
                                 stats,
                                 writer,
                                 outputStream,
-                                profile
+                                profile,
+                                onError,
+                                outputFormat,
+                                keepOriginalFields
                             );
                         }
                     } else {
@@ -357,7 +422,10 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
                             stats,
                             writer,
                             outputStream,
-                            profile
+                            profile,
+                            onError,
+                            outputFormat,
+                            keepOriginalFields
                         );
                     }
                 }
@@ -378,7 +446,10 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
                                     StatsAccumulator stats,
                                     IonWriter writer,
                                     OutputStream outputStream,
-                                    boolean profile) throws TransformException, IOException {
+                                    boolean profile,
+                                    TransformOptions.OnErrorMode onError,
+                                    OutputFormat outputFormat,
+                                    boolean keepOriginalFields) throws TransformException, IOException {
         IonStruct record = asStruct(value);
         stats.processed++;
         try {
@@ -521,7 +592,16 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
     public enum OutputMode {
         AUTO,
         RECORDS,
-        STORE
+        STORE;
+
+        @JsonCreator
+        public static OutputMode from(Object value) {
+            if (value == null) {
+                return null;
+            }
+            String raw = String.valueOf(value).trim();
+            return OutputMode.valueOf(raw.toUpperCase(Locale.ROOT));
+        }
     }
 
     @Builder
@@ -529,13 +609,17 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
             title = "Stored Ion file URI",
-            description = "URI to the stored Ion file when output mode is STORE or AUTO resolves to STORE."
+            description = """
+        URI to the stored Ion file when output mode is STORE or AUTO resolves to STORE.
+        """
         )
         private final String uri;
 
         @Schema(
             title = "Unnested records",
-            description = "JSON-safe records when output mode is RECORDS or AUTO resolves to RECORDS."
+            description = """
+        JSON-safe records when output mode is RECORDS or AUTO resolves to RECORDS.
+        """
         )
         private final List<Object> records;
     }

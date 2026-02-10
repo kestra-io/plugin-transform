@@ -23,7 +23,7 @@ tasks:
   - id: aggregate
     type: io.kestra.plugin.transform.Aggregate
     from: "{{ outputs.fetch.values.records }}"
-    output: RECORDS
+    outputType: RECORDS
     groupBy:
       - customer_id
       - country

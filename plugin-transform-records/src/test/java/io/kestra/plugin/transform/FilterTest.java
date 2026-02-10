@@ -46,7 +46,7 @@ class FilterTest {
         Filter task = Filter.builder()
             .from(Property.ofValue(List.of(record)))
             .where(Property.ofValue("total"))
-            .onError(Filter.OnErrorMode.KEEP)
+            .onError(Property.ofValue(Filter.OnErrorMode.KEEP))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -62,7 +62,7 @@ class FilterTest {
         Filter task = Filter.builder()
             .from(Property.ofValue(List.of(record)))
             .where(Property.ofValue("total"))
-            .onError(Filter.OnErrorMode.SKIP)
+            .onError(Property.ofValue(Filter.OnErrorMode.SKIP))
             .build();
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
@@ -85,5 +85,13 @@ class FilterTest {
         );
 
         assertThat(exception.getMessage(), is("where is required"));
+    }
+
+    @Test
+    void outputModeUriIsRejected() {
+        org.junit.jupiter.api.Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> Filter.OutputMode.from("URI")
+        );
     }
 }

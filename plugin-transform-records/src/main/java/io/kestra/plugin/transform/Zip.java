@@ -4,6 +4,7 @@ import com.amazon.ion.IonList;
 import com.amazon.ion.IonStruct;
 import com.amazon.ion.IonValue;
 import com.amazon.ion.IonWriter;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.executions.metrics.Counter;
@@ -14,10 +15,10 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.transform.ion.IonValueUtils;
 import io.kestra.plugin.transform.util.OutputFormat;
 import io.kestra.plugin.transform.util.TransformException;
-import io.kestra.plugin.transform.util.TransformOptions;
 import io.kestra.plugin.transform.util.TransformProfiler;
 import io.kestra.plugin.transform.util.TransformTaskSupport;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -32,6 +33,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @SuperBuilder
@@ -41,18 +43,45 @@ import java.util.UUID;
 @NoArgsConstructor
 @Schema(
     title = "Zip records",
-    description = "Merge multiple record streams by position (record i with record i)."
+    description = """
+        Merge multiple record streams by position (record i with record i).
+        """
 )
 @Plugin(
     examples = {
         @io.kestra.core.models.annotations.Example(
             title = "Zip records from multiple sources",
-            code = {
-                "inputs:",
-                "  - \"{{ outputs.left.records }}\"",
-                "  - \"{{ outputs.right.records }}\"",
-                "onConflict: RIGHT"
-            }
+            full = true,
+            code = """
+                id: zip_two_sources
+                namespace: company.team
+
+                tasks:
+                  - id: left
+                    type: io.kestra.plugin.core.output.OutputValues
+                    values:
+                      records:
+                        - id: 1
+                          left_value: L1
+                        - id: 2
+                          left_value: L2
+
+                  - id: right
+                    type: io.kestra.plugin.core.output.OutputValues
+                    values:
+                      records:
+                        - id: 1
+                          right_value: R1
+                        - id: 2
+                          right_value: R2
+
+                  - id: zip
+                    type: io.kestra.plugin.transform.Zip
+                    inputs:
+                      - "{{ outputs.left.values.records }}"
+                      - "{{ outputs.right.values.records }}"
+                    onConflict: RIGHT
+                """
         )
     },
     metrics = {
@@ -62,56 +91,77 @@ import java.util.UUID;
     }
 )
 public class Zip extends Task implements RunnableTask<Zip.Output> {
+    @NotNull
     @Schema(
         title = "Input records",
-        description = "List of inputs (Ion list/struct or storage URIs) to align by row position."
+        description = """
+        List of two or more inputs (Ion list/struct or storage URIs) to align by row position.
+        """
     )
     private List<Property<Object>> inputs;
 
     @Builder.Default
-    @Schema(title = "On error behavior")
-    private TransformOptions.OnErrorMode onError = TransformOptions.OnErrorMode.FAIL;
+    @Schema(
+        title = "On error behavior",
+        description = """
+        FAIL stops the task on merge errors (such as field conflicts), SKIP drops the current row.
+        """
+    )
+    private Property<OnErrorMode> onError = Property.ofValue(OnErrorMode.FAIL);
 
     @Builder.Default
-    @Schema(title = "On conflict behavior")
-    private ConflictMode onConflict = ConflictMode.FAIL;
+    @Schema(
+        title = "On conflict behavior",
+        description = """
+        FAIL errors on duplicate field names, LEFT keeps the first value, RIGHT overwrites with the later value.
+        """
+    )
+    private Property<ConflictMode> onConflict = Property.ofValue(ConflictMode.FAIL);
 
     @Builder.Default
     @Schema(
         title = "Output format",
-        description = "Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step."
+        description = """
+        Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step.
+        """
     )
-    private OutputFormat outputFormat = OutputFormat.TEXT;
+    private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
 
     @Schema(
-        title = "Output mode",
-        description = "AUTO stores to internal storage when any input is a storage URI; otherwise it returns records."
+        title = "Output type",
+        description = """
+        AUTO stores to internal storage when any input is a storage URI; otherwise it returns records.
+        """
     )
     @Builder.Default
-    private OutputMode output = OutputMode.AUTO;
+    private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
     @Override
     public Output run(RunContext runContext) throws Exception {
         if (inputs == null || inputs.size() < 2) {
             throw new TransformException("inputs must contain at least two elements");
         }
+        var rOnError = runContext.render(this.onError).as(OnErrorMode.class).orElseThrow();
+        var rOnConflict = runContext.render(this.onConflict).as(ConflictMode.class).orElseThrow();
+        var rOutputFormat = runContext.render(this.outputFormat).as(OutputFormat.class).orElseThrow();
+        var rOutputType = runContext.render(this.outputType).as(OutputMode.class).orElseThrow();
 
-        List<TransformTaskSupport.ResolvedInput> resolvedInputs = new ArrayList<>(inputs.size());
+        var resolvedInputs = new ArrayList<TransformTaskSupport.ResolvedInput>(inputs.size());
         boolean anyFromStorage = false;
         for (Property<Object> input : inputs) {
-            TransformTaskSupport.ResolvedInput resolved = TransformTaskSupport.resolveInput(runContext, input);
+            var resolved = TransformTaskSupport.resolveInput(runContext, input);
             resolvedInputs.add(resolved);
             anyFromStorage = anyFromStorage || resolved.fromStorage();
         }
 
-        OutputMode effectiveOutput = output == OutputMode.AUTO
+        var effectiveOutput = rOutputType == OutputMode.AUTO
             ? (anyFromStorage ? OutputMode.STORE : OutputMode.RECORDS)
-            : output;
+            : rOutputType;
 
-        StatsAccumulator stats = new StatsAccumulator();
+        var stats = new StatsAccumulator();
 
         if (effectiveOutput == OutputMode.STORE && anyFromStorage) {
-            URI storedUri = zipStreamToStorage(runContext, resolvedInputs, stats);
+            var storedUri = zipStreamToStorage(runContext, resolvedInputs, stats, rOnError, rOnConflict, rOutputFormat);
             runContext.metric(Counter.of("processed", stats.processed))
                 .metric(Counter.of("failed", stats.failed))
                 .metric(Counter.of("dropped", stats.dropped));
@@ -120,14 +170,14 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
                 .build();
         }
 
-        List<List<IonStruct>> inputRecords = new ArrayList<>(resolvedInputs.size());
+        var inputRecords = new ArrayList<List<IonStruct>>(resolvedInputs.size());
         for (TransformTaskSupport.ResolvedInput resolved : resolvedInputs) {
             inputRecords.add(TransformTaskSupport.normalizeRecords(resolveInMemory(runContext, resolved)));
         }
         validateSameLength(inputRecords);
 
         if (effectiveOutput == OutputMode.STORE) {
-            URI storedUri = storeRecords(runContext, inputRecords, stats);
+            var storedUri = storeRecords(runContext, inputRecords, stats, rOnError, rOnConflict, rOutputFormat);
             runContext.metric(Counter.of("processed", stats.processed))
                 .metric(Counter.of("failed", stats.failed))
                 .metric(Counter.of("dropped", stats.dropped));
@@ -136,7 +186,7 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
                 .build();
         }
 
-        List<Object> rendered = zipToRecords(inputRecords, stats);
+        var rendered = zipToRecords(inputRecords, stats, rOnError, rOnConflict);
         runContext.metric(Counter.of("processed", stats.processed))
             .metric(Counter.of("failed", stats.failed))
             .metric(Counter.of("dropped", stats.dropped));
@@ -153,20 +203,22 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
     }
 
     private List<Object> zipToRecords(List<List<IonStruct>> inputRecords,
-                                      StatsAccumulator stats) throws TransformException {
+                                      StatsAccumulator stats,
+                                      OnErrorMode onError,
+                                      ConflictMode onConflict) throws TransformException {
         List<Object> outputRecords = new ArrayList<>();
         int length = inputRecords.getFirst().size();
         for (int i = 0; i < length; i++) {
             stats.processed++;
             try {
-                IonStruct merged = mergeRecords(rowAt(inputRecords, i));
+                IonStruct merged = mergeRecords(rowAt(inputRecords, i), onConflict);
                 outputRecords.add(IonValueUtils.toJavaValue(merged));
             } catch (TransformException e) {
                 stats.failed++;
-                if (onError == TransformOptions.OnErrorMode.FAIL) {
+                if (onError == OnErrorMode.FAIL) {
                     throw e;
                 }
-                if (onError == TransformOptions.OnErrorMode.SKIP) {
+                if (onError == OnErrorMode.SKIP) {
                     stats.dropped++;
                 }
             }
@@ -176,7 +228,10 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
 
     private URI storeRecords(RunContext runContext,
                              List<List<IonStruct>> inputRecords,
-                             StatsAccumulator stats) throws TransformException {
+                             StatsAccumulator stats,
+                             OnErrorMode onError,
+                             ConflictMode onConflict,
+                             OutputFormat outputFormat) throws TransformException {
         String name = "zip-" + UUID.randomUUID() + ".ion";
         try {
             java.nio.file.Path outputPath = runContext.workingDir().createTempFile(".ion");
@@ -189,7 +244,7 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
                     stats.processed++;
                     try {
                         long transformStart = profile ? System.nanoTime() : 0L;
-                        IonStruct merged = mergeRecords(rowAt(inputRecords, i));
+                        IonStruct merged = mergeRecords(rowAt(inputRecords, i), onConflict);
                         if (profile) {
                             TransformProfiler.addTransformNs(System.nanoTime() - transformStart);
                         }
@@ -201,10 +256,10 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
                         }
                     } catch (TransformException e) {
                         stats.failed++;
-                        if (onError == TransformOptions.OnErrorMode.FAIL) {
+                        if (onError == OnErrorMode.FAIL) {
                             throw e;
                         }
-                        if (onError == TransformOptions.OnErrorMode.SKIP) {
+                        if (onError == OnErrorMode.SKIP) {
                             stats.dropped++;
                         }
                     }
@@ -218,7 +273,10 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
 
     private URI zipStreamToStorage(RunContext runContext,
                                    List<TransformTaskSupport.ResolvedInput> inputs,
-                                   StatsAccumulator stats) throws TransformException {
+                                   StatsAccumulator stats,
+                                   OnErrorMode onError,
+                                   ConflictMode onConflict,
+                                   OutputFormat outputFormat) throws TransformException {
         String name = "zip-" + UUID.randomUUID() + ".ion";
         try (MultiCursor cursor = openCursors(runContext, inputs)) {
             java.nio.file.Path outputPath = runContext.workingDir().createTempFile(".ion");
@@ -233,7 +291,7 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
                     stats.processed++;
                     try {
                         long transformStart = profile ? System.nanoTime() : 0L;
-                        IonStruct merged = mergeRecords(cursor.nextRow());
+                        IonStruct merged = mergeRecords(cursor.nextRow(), onConflict);
                         if (profile) {
                             TransformProfiler.addTransformNs(System.nanoTime() - transformStart);
                         }
@@ -245,10 +303,10 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
                         }
                     } catch (TransformException e) {
                         stats.failed++;
-                        if (onError == TransformOptions.OnErrorMode.FAIL) {
+                        if (onError == OnErrorMode.FAIL) {
                             throw e;
                         }
-                        if (onError == TransformOptions.OnErrorMode.SKIP) {
+                        if (onError == OnErrorMode.SKIP) {
                             stats.dropped++;
                         }
                     }
@@ -260,7 +318,7 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
         }
     }
 
-    private IonStruct mergeRecords(List<IonStruct> records) throws TransformException {
+    private IonStruct mergeRecords(List<IonStruct> records, ConflictMode onConflict) throws TransformException {
         IonStruct merged = IonValueUtils.system().newEmptyStruct();
         for (IonStruct record : records) {
             for (IonValue value : record) {
@@ -466,10 +524,24 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
         RIGHT
     }
 
+    public enum OnErrorMode {
+        FAIL,
+        SKIP
+    }
+
     public enum OutputMode {
         AUTO,
         RECORDS,
-        STORE
+        STORE;
+
+        @JsonCreator
+        public static OutputMode from(Object value) {
+            if (value == null) {
+                return null;
+            }
+            String raw = String.valueOf(value).trim();
+            return OutputMode.valueOf(raw.toUpperCase(Locale.ROOT));
+        }
     }
 
     @Builder
@@ -477,13 +549,17 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
             title = "Stored Ion file URI",
-            description = "URI to the stored Ion file when output mode is STORE or AUTO resolves to STORE."
+            description = """
+        URI to the stored Ion file when output mode is STORE or AUTO resolves to STORE.
+        """
         )
         private final String uri;
 
         @Schema(
             title = "Zipped records",
-            description = "JSON-safe records when output mode is RECORDS or AUTO resolves to RECORDS."
+            description = """
+        JSON-safe records when output mode is RECORDS or AUTO resolves to RECORDS.
+        """
         )
         private final List<Object> records;
     }

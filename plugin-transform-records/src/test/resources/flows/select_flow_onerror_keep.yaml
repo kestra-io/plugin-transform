@@ -17,5 +17,5 @@ tasks:
         expr: total_spent
         type: DECIMAL
     onError: KEEP
-    output: RECORDS
+    outputType: RECORDS
 

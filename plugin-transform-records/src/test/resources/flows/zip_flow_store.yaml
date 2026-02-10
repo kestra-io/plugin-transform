@@ -23,4 +23,4 @@ tasks:
     inputs:
       - "{{ outputs.left.values.records }}"
       - "{{ outputs.right.values.records }}"
-    output: STORE
+    outputType: STORE
