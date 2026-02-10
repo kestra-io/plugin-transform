@@ -2,3 +2,4 @@ rootProject.name = 'plugin-transform'
 
 include 'plugin-transform-json'
 include 'plugin-transform-grok'
+include 'plugin-transform-records'

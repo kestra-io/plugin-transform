@@ -1,0 +1,26 @@
+id: zip_flow_store
+namespace: dev.tests
+
+tasks:
+  - id: left
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - id: "a"
+          value: 1
+        - id: "b"
+          value: 2
+
+  - id: right
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - status: "ok"
+        - status: "fail"
+
+  - id: zip
+    type: io.kestra.plugin.transform.Zip
+    inputs:
+      - "{{ outputs.left.values.records }}"
+      - "{{ outputs.right.values.records }}"
+    output: STORE

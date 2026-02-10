@@ -1,0 +1,41 @@
+id: select_flow
+namespace: io.kestra.tests
+
+tasks:
+  - id: left
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - order_id: 1
+          amount: "120.00"
+        - order_id: 2
+          amount: "80.00"
+
+  - id: right
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - score: "0.91"
+        - score: "0.72"
+
+  - id: select
+    type: io.kestra.plugin.transform.Select
+    inputs:
+      - "{{ outputs.left.values.records }}"
+      - "{{ outputs.right.values.records }}"
+    where: $1.amount > 100 && $2.score > 0.8
+    fields:
+      order_id:
+        expr: $1.order_id
+        type: INT
+      amount:
+        expr: $1.amount
+        type: DECIMAL
+      score:
+        expr: $2.score
+        type: DECIMAL
+      optional_missing:
+        expr: missing
+        optional: true
+    dropNulls: true
+    output: RECORDS

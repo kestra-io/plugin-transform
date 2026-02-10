@@ -1,0 +1,21 @@
+id: select_flow_onerror_keep
+namespace: io.kestra.tests
+
+tasks:
+  - id: left
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - total_spent: "not-a-number"
+
+  - id: select
+    type: io.kestra.plugin.transform.Select
+    inputs:
+      - "{{ outputs.left.values.records }}"
+    fields:
+      total_spent:
+        expr: total_spent
+        type: DECIMAL
+    onError: KEEP
+    output: RECORDS
+

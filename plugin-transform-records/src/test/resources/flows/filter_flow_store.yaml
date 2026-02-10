@@ -1,0 +1,18 @@
+id: filter_flow_store
+namespace: io.kestra.tests
+
+tasks:
+  - id: fetch
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - active: true
+          total: 5
+        - active: false
+          total: 20
+
+  - id: filter
+    type: io.kestra.plugin.transform.Filter
+    from: "{{ outputs.fetch.values.records }}"
+    where: active && total < 10
+    output: STORE
