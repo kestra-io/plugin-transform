@@ -1,5 +1,4 @@
-@PluginSubGroup(title = "Grok", categories = PluginSubGroup.PluginCategory.TRANSFORMATION,
-    categories = { PluginSubGroup.PluginCategory.DATA }
+@PluginSubGroup(title = "Grok",categories = { PluginSubGroup.PluginCategory.DATA }
 )
 package io.kestra.plugin.transform.grok;
 
