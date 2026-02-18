@@ -1,0 +1,17 @@
+project.description = 'Kestra Plugin Transformation for records.'
+
+jar {
+    manifest {
+        attributes(
+                "X-Kestra-Name": project.name,
+                "X-Kestra-Title": "Transform",
+                "X-Kestra-Group": project.group + ".transform",
+                "X-Kestra-Description": project.description,
+                "X-Kestra-Version": project.version
+        )
+    }
+}
+
+dependencies {
+    implementation "com.amazon.ion:ion-java:1.11.11"
+}

@@ -1,0 +1,25 @@
+id: select_flow_length_mismatch_skip
+namespace: io.kestra.tests
+
+tasks:
+  - id: left
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - id: "a"
+
+  - id: right
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - status: "ok"
+        - status: "fail"
+
+  - id: select
+    type: io.kestra.plugin.transform.Select
+    inputs:
+      - "{{ outputs.left.values.records }}"
+      - "{{ outputs.right.values.records }}"
+    onLengthMismatch: SKIP
+    outputType: RECORDS
+

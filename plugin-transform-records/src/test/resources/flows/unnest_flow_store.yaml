@@ -1,0 +1,19 @@
+id: unnest_flow_store
+namespace: io.kestra.tests
+
+tasks:
+  - id: fetch
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - id: "o1"
+          items:
+            - sku: "A"
+            - sku: "B"
+
+  - id: explode
+    type: io.kestra.plugin.transform.Unnest
+    from: "{{ outputs.fetch.values.records }}"
+    path: items[]
+    as: item
+    outputType: STORE

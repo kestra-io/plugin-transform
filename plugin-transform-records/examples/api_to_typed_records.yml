@@ -1,0 +1,66 @@
+id: api_to_typed_records
+namespace: playground.transform
+description: Example of typed record normalization with the Map transform
+
+tasks:
+
+  # 1) Simulate an API response
+  - id: fetch
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - user:
+            id: "u-123"
+            name:
+              first: "Georg"
+              last: "Traar"
+          createdAt: "2025-12-24T10:15:30Z"
+          items:
+            - price: "19.99"
+            - price: "5.50"
+          active: "true"
+
+        - user:
+            id: "u-456"
+            name:
+              first: "Anna"
+              last: "Müller"
+          createdAt: "2025-12-23T08:00:00Z"
+          items:
+            - price: "100.00"
+          active: "false"
+
+
+  # 2) Normalize + type
+  - id: normalize
+    type: io.kestra.plugin.transform.Map
+    from: "{{ outputs.fetch.values.records }}"
+
+    fields:
+      customer_id: user.id
+      full_name:
+        expr: concat(user.name.first, " ", user.name.last)
+        type: STRING
+      created_at:
+        expr: createdAt
+        type: TIMESTAMP
+      total_spent:
+        expr: sum(items[].price)
+        type: DECIMAL
+      is_active:
+        expr: active
+        type: BOOLEAN
+
+    keepOriginalFields: false
+    dropNulls: true
+    onError: FAIL
+
+
+  # 3) Inspect the result (debug)
+  - id: debug
+    type: io.kestra.plugin.core.log.Log
+    message: | 
+      "{{ outputs.fetch.values.records }}"
+      
+      "{{ outputs.normalize.records }}"
+    

@@ -1,0 +1,43 @@
+id: aggregate_totals
+namespace: playground.transform
+description: Aggregate totals per customer and country
+
+tasks:
+  - id: fetch
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - customer_id: "c1"
+          country: "FR"
+          total_spent: 10
+          created_at: "2024-01-01T00:00:00Z"
+        - customer_id: "c1"
+          country: "FR"
+          total_spent: 5
+          created_at: "2024-01-02T00:00:00Z"
+        - customer_id: "c2"
+          country: "US"
+          total_spent: 7
+          created_at: "2024-01-03T00:00:00Z"
+
+  - id: aggregate
+    type: io.kestra.plugin.transform.Aggregate
+    from: "{{ outputs.fetch.values.records }}"
+    outputType: RECORDS
+    groupBy:
+      - customer_id
+      - country
+    aggregates:
+      order_count:
+        expr: count()
+        type: INT
+      total_spent:
+        expr: sum(total_spent)
+        type: DECIMAL
+      last_order_at:
+        expr: max(parseTimestamp(created_at))
+        type: TIMESTAMP
+
+  - id: log
+    type: io.kestra.plugin.core.log.Log
+    message: "{{ outputs.aggregate.records }}"
