@@ -10,11 +10,16 @@ import io.kestra.core.models.tasks.Output;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import java.io.IOException;
 import java.time.Duration;
+
+import io.kestra.core.models.enums.MonacoLanguages;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -23,6 +28,7 @@ import java.time.Duration;
 @NoArgsConstructor
 public abstract class Transform<T extends Output> extends Task implements JSONataInterface, RunnableTask<T> {
 
+    @PluginProperty(language = MonacoLanguages.JAVASCRIPT)
     private Property<String> expression;
 
     @Builder.Default
