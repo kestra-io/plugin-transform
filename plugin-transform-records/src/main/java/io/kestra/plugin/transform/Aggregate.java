@@ -370,9 +370,6 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                                       DefaultIonCaster caster,
                                       StatsAccumulator stats,
                                       TransformOptions.OnErrorMode onError) throws TransformException {
-        if (bucket.skip) {
-            return null;
-        }
         IonStruct output = IonValueUtils.system().newEmptyStruct();
         for (String field : groupByFields) {
             IonValue value = bucket.groupValues.get(field);
@@ -419,9 +416,6 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
         stats.processed++;
         GroupKey key = buildGroupKey(record, groupByFields);
         GroupBucket bucket = grouped.computeIfAbsent(key, k -> new GroupBucket(record, groupByFields, mappings));
-        if (bucket.skip) {
-            return;
-        }
         for (AggregateMapping mapping : mappings) {
             AggregateState state = bucket.states.get(mapping.targetField);
             if (state.isFinal()) {
@@ -435,8 +429,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                     throw new TransformException(e.getMessage(), e);
                 }
                 if (onError == TransformOptions.OnErrorMode.SKIP) {
-                    bucket.skip = true;
-                    return;
+                    break;
                 }
                 if (onError == TransformOptions.OnErrorMode.NULL) {
                     state.forceNull();
@@ -603,7 +596,6 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
     private static final class GroupBucket {
         private final Map<String, IonValue> groupValues = new LinkedHashMap<>();
         private final Map<String, AggregateState> states = new LinkedHashMap<>();
-        private boolean skip;
 
         private GroupBucket(IonStruct record, List<String> groupByFields, List<AggregateMapping> mappings) {
             for (String field : groupByFields) {
