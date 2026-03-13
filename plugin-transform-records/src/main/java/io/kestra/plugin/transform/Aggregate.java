@@ -414,8 +414,14 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                              DefaultExpressionEngine expressionEngine,
                              TransformOptions.OnErrorMode onError) throws TransformException {
         stats.processed++;
-        GroupKey key = buildGroupKey(record, groupByFields);
-        GroupBucket bucket = grouped.computeIfAbsent(key, k -> new GroupBucket(record, groupByFields, mappings));
+        GroupKey key = buildGroupKey(record, groupByFields, expressionEngine);
+        GroupBucket bucket = grouped.computeIfAbsent(key, k -> {
+            try {
+                return new GroupBucket(record, groupByFields, mappings, expressionEngine);
+            } catch (TransformException e) {
+                throw new IllegalStateException(e);
+            }
+        });
         for (AggregateMapping mapping : mappings) {
             AggregateState state = bucket.states.get(mapping.targetField);
             if (state.isFinal()) {
@@ -477,11 +483,15 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
         return arg;
     }
 
-    private GroupKey buildGroupKey(IonStruct record, List<String> groupByFields) throws TransformException {
+    private GroupKey buildGroupKey(IonStruct record, List<String> groupByFields, DefaultExpressionEngine expressionEngine) throws TransformException {
         List<Object> key = new ArrayList<>();
         for (String field : groupByFields) {
-            IonValue value = record.get(field);
-            key.add(IonValueUtils.toJavaValue(value));
+            try {
+                var value = expressionEngine.evaluate(field, record);
+                key.add(IonValueUtils.toJavaValue(value));
+            } catch (ExpressionException e) {
+                throw new TransformException("Failed to resolve groupBy field '" + field + "': " + e.getMessage(), e);
+            }
         }
         return new GroupKey(key);
     }
@@ -597,9 +607,13 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
         private final Map<String, IonValue> groupValues = new LinkedHashMap<>();
         private final Map<String, AggregateState> states = new LinkedHashMap<>();
 
-        private GroupBucket(IonStruct record, List<String> groupByFields, List<AggregateMapping> mappings) {
+        private GroupBucket(IonStruct record, List<String> groupByFields, List<AggregateMapping> mappings, DefaultExpressionEngine expressionEngine) throws TransformException {
             for (String field : groupByFields) {
-                groupValues.put(field, record.get(field));
+                try {
+                    groupValues.put(field, expressionEngine.evaluate(field, record));
+                } catch (ExpressionException e) {
+                    throw new TransformException("Failed to resolve groupBy field '" + field + "': " + e.getMessage(), e);
+                }
             }
             for (AggregateMapping mapping : mappings) {
                 states.put(mapping.targetField, new AggregateState(mapping.function));

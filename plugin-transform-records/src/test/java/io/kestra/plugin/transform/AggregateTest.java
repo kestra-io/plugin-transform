@@ -174,6 +174,55 @@ class AggregateTest {
         assertThat(row.get("total_spent"), is(new BigDecimal("18.00")));
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void groupsByNestedFieldPath() throws Exception {
+        var first = java.util.Map.of(
+            "user", java.util.Map.of("id", "u1", "name", "Alice"),
+            "amount", new BigDecimal("10.00")
+        );
+        var second = java.util.Map.of(
+            "user", java.util.Map.of("id", "u1", "name", "Alice"),
+            "amount", new BigDecimal("5.00")
+        );
+        var third = java.util.Map.of(
+            "user", java.util.Map.of("id", "u2", "name", "Bob"),
+            "amount", new BigDecimal("7.00")
+        );
+
+        var task = Aggregate.builder()
+            .from(Property.ofValue(List.of(first, second, third)))
+            .groupBy(Property.ofValue(List.of("user.id")))
+            .aggregates(Property.ofValue(java.util.Map.of(
+                "order_count", Aggregate.AggregateDefinition.builder().expr("count()").type(IonTypeName.INT).build(),
+                "total", Aggregate.AggregateDefinition.builder().expr("sum(amount)").type(IonTypeName.DECIMAL).build()
+            )))
+            .build();
+
+        var runContext = runContextFactory.of(java.util.Map.of());
+        var output = task.run(runContext);
+
+        assertThat(output.getRecords(), hasSize(2));
+
+        // Find the group for user.id = "u1"
+        var u1 = output.getRecords().stream()
+            .map(r -> (java.util.Map<String, Object>) r)
+            .filter(r -> "u1".equals(r.get("user.id")))
+            .findFirst()
+            .orElseThrow();
+        assertThat(u1.get("order_count"), is(2L));
+        assertThat(u1.get("total"), is(new BigDecimal("15.00")));
+
+        // Find the group for user.id = "u2"
+        var u2 = output.getRecords().stream()
+            .map(r -> (java.util.Map<String, Object>) r)
+            .filter(r -> "u2".equals(r.get("user.id")))
+            .findFirst()
+            .orElseThrow();
+        assertThat(u2.get("order_count"), is(1L));
+        assertThat(u2.get("total"), is(new BigDecimal("7.00")));
+    }
+
     @Test
     void outputModeUriIsRejected() {
         org.junit.jupiter.api.Assertions.assertThrows(
