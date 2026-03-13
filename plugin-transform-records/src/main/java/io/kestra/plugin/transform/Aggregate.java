@@ -134,6 +134,7 @@ import java.util.UUID;
     metrics = {
         @Metric(name = "processed", type = Counter.TYPE),
         @Metric(name = "groups", type = Counter.TYPE),
+        @Metric(name = "dropped", type = Counter.TYPE),
         @Metric(name = "failed", type = Counter.TYPE)
     }
 )
@@ -246,6 +247,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
             var stored = storeRecords(runContext, grouped, groupByFields, mappings, caster, stats, rOnError, rOutputFormat);
             runContext.metric(Counter.of("processed", stats.processed))
                 .metric(Counter.of("groups", stats.groups))
+                .metric(Counter.of("dropped", stats.dropped))
                 .metric(Counter.of("failed", stats.failed));
             return Output.builder()
                 .uri(stored.toString())
@@ -255,6 +257,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
         var rendered = aggregateToRecords(grouped, groupByFields, mappings, caster, stats, rOnError);
         runContext.metric(Counter.of("processed", stats.processed))
             .metric(Counter.of("groups", stats.groups))
+            .metric(Counter.of("dropped", stats.dropped))
             .metric(Counter.of("failed", stats.failed));
         return Output.builder()
             .records(rendered)
@@ -395,6 +398,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                     throw new TransformException(e.getMessage(), e);
                 }
                 if (onError == TransformOptions.OnErrorMode.SKIP) {
+                    stats.dropped++;
                     return null;
                 }
                 if (onError == TransformOptions.OnErrorMode.NULL) {
@@ -435,6 +439,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                     throw new TransformException(e.getMessage(), e);
                 }
                 if (onError == TransformOptions.OnErrorMode.SKIP) {
+                    stats.dropped++;
                     break;
                 }
                 if (onError == TransformOptions.OnErrorMode.NULL) {
@@ -814,6 +819,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
     private static final class StatsAccumulator {
         private int processed;
         private int groups;
+        private int dropped;
         private int failed;
     }
 
