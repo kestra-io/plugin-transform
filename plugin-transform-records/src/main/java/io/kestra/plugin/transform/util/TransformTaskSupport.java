@@ -69,21 +69,23 @@ public final class TransformTaskSupport {
         return new ResolvedInput(value, false, null);
     }
 
+    private static final String KESTRA_SCHEME = "kestra";
+
     private static ResolvedInput resolveStorageCandidate(Object value) {
         if (value instanceof URI uriValue) {
-            if (uriValue.getScheme() == null) {
+            if (!KESTRA_SCHEME.equals(uriValue.getScheme())) {
                 return new ResolvedInput(value, false, null);
             }
             return new ResolvedInput(uriValue, true, uriValue);
         }
         if (value instanceof String stringValue) {
+            if (!stringValue.startsWith(KESTRA_SCHEME + ":")) {
+                return null;
+            }
             URI uri;
             try {
                 uri = URI.create(stringValue);
             } catch (IllegalArgumentException e) {
-                return null;
-            }
-            if (uri.getScheme() == null) {
                 return null;
             }
             return new ResolvedInput(uri, true, uri);
