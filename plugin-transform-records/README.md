@@ -18,7 +18,7 @@ Multi-input tasks:
 - `Zip`: `inputs` (list)
 - `Select`: `inputs` (list)
 
-Output mode (`output`) supports:
+Output mode (`outputType`) supports:
 - `AUTO` (default): STORE if `from` is a storage URI, else RECORDS
 - `RECORDS`: emit `outputs.records`
 - `STORE`: write newline-delimited Ion to internal storage and emit `outputs.uri`
@@ -34,7 +34,7 @@ Experimental output format (`outputFormat`):
 - Boolean: `&& || !`
 - Functions: `sum`, `count`, `min`, `max`, `avg`, `first`, `last`, `coalesce`, `concat`, `toInt`, `toDecimal`, `toString`, `toBoolean`, `parseTimestamp`
 
-Cheat sheet: `docs/EXPRESSION_CHEATSHEET.md`
+See the expression language section above for supported syntax.
 
 ## Type casting
 - `type` is optional in Map/Aggregate definitions.
@@ -214,7 +214,7 @@ Example: merge two record streams by row position
 More flows live in `examples/`.
 
 ## Migration notes
-See `docs/UPGRADE.md` for breaking changes (options flattening, renamed fields).
+Options have been flattened to top-level task properties (e.g., `onError`, `outputType`, `outputFormat`).
 
 ## Development
 Prerequisites:
