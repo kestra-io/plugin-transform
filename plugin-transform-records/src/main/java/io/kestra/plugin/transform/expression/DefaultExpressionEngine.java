@@ -350,7 +350,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
         private IonValue castInt(List<IonValue> values) throws ExpressionException {
             requireArgCount(values, 1);
             try {
-                BigDecimal decimal = IonValueUtils.asDecimal(values.get(0));
+                BigDecimal decimal = IonValueUtils.asDecimal(values.getFirst());
                 if (decimal == null) {
                     return IonValueUtils.nullValue();
                 }
@@ -363,7 +363,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
         private IonValue castDecimal(List<IonValue> values) throws ExpressionException {
             requireArgCount(values, 1);
             try {
-                BigDecimal decimal = IonValueUtils.asDecimal(values.get(0));
+                BigDecimal decimal = IonValueUtils.asDecimal(values.getFirst());
                 if (decimal == null) {
                     return IonValueUtils.nullValue();
                 }
@@ -375,7 +375,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
 
         private IonValue castString(List<IonValue> values) {
             requireArgCount(values, 1);
-            String stringValue = IonValueUtils.asString(values.get(0));
+            String stringValue = IonValueUtils.asString(values.getFirst());
             if (stringValue == null) {
                 return IonValueUtils.nullValue();
             }
@@ -385,7 +385,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
         private IonValue castBoolean(List<IonValue> values) throws ExpressionException {
             requireArgCount(values, 1);
             try {
-                Boolean bool = IonValueUtils.asBoolean(values.get(0));
+                Boolean bool = IonValueUtils.asBoolean(values.getFirst());
                 if (bool == null) {
                     return IonValueUtils.nullValue();
                 }
@@ -398,7 +398,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
         private IonValue parseTimestamp(List<IonValue> values) throws ExpressionException {
             requireArgCount(values, 1);
             try {
-                Instant instant = IonValueUtils.asInstant(values.get(0));
+                Instant instant = IonValueUtils.asInstant(values.getFirst());
                 if (instant == null) {
                     return IonValueUtils.nullValue();
                 }
@@ -410,7 +410,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
 
         private IonValue sum(List<IonValue> values) throws ExpressionException {
             requireArgCount(values, 1);
-            IonList list = asList(values.get(0));
+            IonList list = asList(values.getFirst());
             if (list == null) {
                 return IonValueUtils.nullValue();
             }
@@ -426,7 +426,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
 
         private IonValue count(List<IonValue> values) throws ExpressionException {
             requireArgCount(values, 1);
-            IonList list = asList(values.get(0));
+            IonList list = asList(values.getFirst());
             if (list == null) {
                 return IonValueUtils.nullValue();
             }
@@ -435,7 +435,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
 
         private IonValue min(List<IonValue> values) throws ExpressionException {
             requireArgCount(values, 1);
-            IonList list = asList(values.get(0));
+            IonList list = asList(values.getFirst());
             if (list == null || list.isEmpty()) {
                 return IonValueUtils.nullValue();
             }
@@ -454,7 +454,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
 
         private IonValue max(List<IonValue> values) throws ExpressionException {
             requireArgCount(values, 1);
-            IonList list = asList(values.get(0));
+            IonList list = asList(values.getFirst());
             if (list == null || list.isEmpty()) {
                 return IonValueUtils.nullValue();
             }

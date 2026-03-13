@@ -507,7 +507,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
             return List.of();
         }
         if (list.size() == 1) {
-            IonValue value = list.get(0);
+            IonValue value = list.getFirst();
             if (value instanceof IonStruct || value instanceof IonList) {
                 return value;
             }
