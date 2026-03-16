@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80" fill="none">
+<g filter="url(#filter0_i_1465_232)">
+<path d="M0 20C0 8.95431 8.95431 0 20 0H60C71.0457 0 80 8.95431 80 20V60C80 71.0457 71.0457 80 60 80H20C8.95431 80 0 71.0457 0 60V20Z" fill="url(#paint0_linear_1465_232)"/>
+</g>
+<g clip-path="url(#paint2_angular_1465_232_clip_path)" data-figma-skip-parse="true"><g transform="matrix(0 0.04 -0.04 0 40 40)"><foreignObject x="-1025" y="-1025" width="2050" height="2050"><div xmlns="http://www.w3.org/1999/xhtml" style="background:conic-gradient(from 90deg,rgba(181, 231, 255, 1) 0deg,rgba(241, 117, 255, 1) 72.6923deg,rgba(241, 117, 255, 0.1) 360deg);height:100%;width:100%;opacity:1"></div></foreignObject></g></g><path d="M60 76.6667V80H20V76.6667H60ZM76.6667 60V20C76.6667 10.7953 69.2047 3.33333 60 3.33333H20C10.7953 3.33333 3.33333 10.7953 3.33333 20V60C3.33333 69.2047 10.7953 76.6667 20 76.6667V80C8.95431 80 0 71.0457 0 60V20C0 8.95431 8.95431 0 20 0H60C71.0457 0 80 8.95431 80 20V60C80 71.0457 71.0457 80 60 80V76.6667C69.2047 76.6667 76.6667 69.2047 76.6667 60Z" data-figma-gradient-fill="{&quot;type&quot;:&quot;GRADIENT_ANGULAR&quot;,&quot;stops&quot;:[{&quot;color&quot;:{&quot;r&quot;:0.71089994907379150,&quot;g&quot;:0.90845167636871338,&quot;b&quot;:1.0,&quot;a&quot;:1.0},&quot;position&quot;:0.0},{&quot;color&quot;:{&quot;r&quot;:0.94509804248809814,&quot;g&quot;:0.45882353186607361,&quot;b&quot;:1.0,&quot;a&quot;:1.0},&quot;position&quot;:0.20192307233810425},{&quot;color&quot;:{&quot;r&quot;:0.94509804248809814,&quot;g&quot;:0.45882353186607361,&quot;b&quot;:1.0,&quot;a&quot;:0.10000000149011612},&quot;position&quot;:1.0}],&quot;stopsVar&quot;:[{&quot;color&quot;:{&quot;r&quot;:0.71089994907379150,&quot;g&quot;:0.90845167636871338,&quot;b&quot;:1.0,&quot;a&quot;:1.0},&quot;position&quot;:0.0},{&quot;color&quot;:{&quot;r&quot;:0.94509804248809814,&quot;g&quot;:0.45882353186607361,&quot;b&quot;:1.0,&quot;a&quot;:1.0},&quot;position&quot;:0.20192307233810425},{&quot;color&quot;:{&quot;r&quot;:0.94509804248809814,&quot;g&quot;:0.45882353186607361,&quot;b&quot;:1.0,&quot;a&quot;:0.10000000149011612},&quot;position&quot;:1.0}],&quot;transform&quot;:{&quot;m00&quot;:4.8985871985824346e-15,&quot;m01&quot;:-80.0,&quot;m02&quot;:80.0,&quot;m10&quot;:80.0,&quot;m11&quot;:4.8985871985824346e-15,&quot;m12&quot;:0.0},&quot;opacity&quot;:1.0,&quot;blendMode&quot;:&quot;NORMAL&quot;,&quot;visible&quot;:true}"/>
+<defs>
+<linearGradient id="paint3_linear_1465_232" x1="22" y1="22" x2="58" y2="58" gradientUnits="userSpaceOnUse">
+<stop stop-color="#B5E7FF"/>
+<stop offset="0.45" stop-color="#F175FF"/>
+<stop offset="1" stop-color="#8F41FF"/>
+</linearGradient>
+</defs>
+<path d="M24 25H34.5C39.1944 25 43 28.8056 43 33.5V40" stroke="url(#paint3_linear_1465_232)" stroke-width="4.5" stroke-linecap="round"/>
+<path d="M24 55H34.5C39.1944 55 43 51.1944 43 46.5V40" stroke="url(#paint3_linear_1465_232)" stroke-width="4.5" stroke-linecap="round"/>
+<path d="M43 40H58" stroke="url(#paint3_linear_1465_232)" stroke-width="4.5" stroke-linecap="round"/>
+<circle cx="24" cy="25" r="3.5" fill="#D9F4FF"/>
+<circle cx="24" cy="55" r="3.5" fill="#F0D1FF"/>
+<circle cx="58" cy="40" r="3.5" fill="#DCC8FF"/>
+<defs>
+<filter id="filter0_i_1465_232" x="0" y="0" width="80" height="82" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="2"/>
+<feGaussianBlur stdDeviation="1"/>
+<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.75 0"/>
+<feBlend mode="normal" in2="shape" result="effect1_innerShadow_1465_232"/>
+</filter>
+<clipPath id="paint2_angular_1465_232_clip_path"><path d="M60 76.6667V80H20V76.6667H60ZM76.6667 60V20C76.6667 10.7953 69.2047 3.33333 60 3.33333H20C10.7953 3.33333 3.33333 10.7953 3.33333 20V60C3.33333 69.2047 10.7953 76.6667 20 76.6667V80C8.95431 80 0 71.0457 0 60V20C0 8.95431 8.95431 0 20 0H60C71.0457 0 80 8.95431 80 20V60C80 71.0457 71.0457 80 60 80V76.6667C69.2047 76.6667 76.6667 69.2047 76.6667 60Z"/></clipPath><linearGradient id="paint0_linear_1465_232" x1="73.3333" y1="68.3333" x2="11.6667" y2="10" gradientUnits="userSpaceOnUse">
+<stop stop-color="#01000B"/>
+<stop offset="1" stop-color="#520188"/>
+</linearGradient>
+<linearGradient id="paint1_linear_1465_232" x1="40.9998" y1="38.0349" x2="45.6756" y2="69.4712" gradientUnits="userSpaceOnUse">
+<stop stop-color="#EEDBFF"/>
+<stop offset="0.485577" stop-color="#A950FF"/>
+<stop offset="1" stop-color="#F7E7FF"/>
+</linearGradient>
+</defs>
+</svg>
