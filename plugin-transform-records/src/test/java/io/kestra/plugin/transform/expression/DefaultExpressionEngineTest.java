@@ -108,6 +108,56 @@ class DefaultExpressionEngineTest {
     }
 
     @Test
+    void resolvesNumericArrayIndexAccess() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+        var products = IonValueUtils.system().newEmptyList();
+
+        IonStruct first = IonValueUtils.system().newEmptyStruct();
+        first.put("title", IonValueUtils.system().newString("Phone"));
+        IonStruct second = IonValueUtils.system().newEmptyStruct();
+        second.put("title", IonValueUtils.system().newString("Laptop"));
+
+        products.add(first);
+        products.add(second);
+        record.put("products", products);
+
+        IonValue value = engine.evaluate("products[0].title", record);
+
+        assertThat(IonValueUtils.toJavaValue(value), is("Phone"));
+    }
+
+    @Test
+    void returnsNullForOutOfBoundsArrayIndex() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+        var products = IonValueUtils.system().newEmptyList();
+
+        IonStruct first = IonValueUtils.system().newEmptyStruct();
+        first.put("title", IonValueUtils.system().newString("Phone"));
+        products.add(first);
+        record.put("products", products);
+
+        IonValue value = engine.evaluate("products[3].title", record);
+
+        assertThat(IonValueUtils.isNull(value), is(true));
+    }
+
+    @Test
+    void rejectsArrayIndexOnNonList() {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+        record.put("products", IonValueUtils.system().newString("oops"));
+
+        ExpressionException exception = Assertions.assertThrows(
+            ExpressionException.class,
+            () -> engine.evaluate("products[0].title", record)
+        );
+
+        assertThat(exception.getMessage(), containsString("Expected list for segment 'products[0]'"));
+    }
+
+    @Test
     void respectsArithmeticPrecedence() throws Exception {
         DefaultExpressionEngine engine = new DefaultExpressionEngine();
         IonStruct record = IonValueUtils.system().newEmptyStruct();
@@ -313,9 +363,10 @@ class DefaultExpressionEngineTest {
         assertInvalid(engine, record, "(", "Unexpected token");
         assertInvalid(engine, record, "1 + 2)", "Unexpected token");
         assertInvalid(engine, record, "user..id", "Expected identifier after '.'");
-        assertInvalid(engine, record, "user[foo]", "Expected ']' or string key after '['");
-        assertInvalid(engine, record, "user[", "Expected ']' or string key after '['");
+        assertInvalid(engine, record, "user[foo]", "Expected ']', string key, or numeric index after '['");
+        assertInvalid(engine, record, "user[", "Expected ']', string key, or numeric index after '['");
         assertInvalid(engine, record, "user[\"x\"", "Expected ']'");
+        assertInvalid(engine, record, "user[1.2]", "Expected integer index after '['");
         assertInvalid(engine, record, "sum(1 2)", "Expected ')'");
         assertInvalid(engine, record, "sum(,)", "Unexpected token");
         assertInvalid(engine, record, "1..2", "Invalid number literal");

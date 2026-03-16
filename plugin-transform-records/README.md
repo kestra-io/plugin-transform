@@ -29,7 +29,7 @@ Experimental output format (`outputFormat`):
 
 ## Expression language
 - Field access: `user.address.city` or `user["first name"]`
-- Arrays: `items[].price`
+- Arrays: `items[].price` or `items[0].price`
 - Comparisons: `> < == != >= <=`
 - Boolean: `&& || !`
 - Functions: `sum`, `count`, `min`, `max`, `avg`, `first`, `last`, `coalesce`, `concat`, `toInt`, `toDecimal`, `toString`, `toBoolean`, `parseTimestamp`

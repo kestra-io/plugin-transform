@@ -113,6 +113,18 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
                 }
                 return result;
             }
+            if (segment.arrayIndex() != null) {
+                if (IonValueUtils.isNull(nextValue)) {
+                    return IonValueUtils.nullValue();
+                }
+                if (!(nextValue instanceof IonList list)) {
+                    throw new ExpressionException("Expected list for segment '" + segment.name() + "[" + segment.arrayIndex() + "]'");
+                }
+                if (segment.arrayIndex() < 0 || segment.arrayIndex() >= list.size()) {
+                    return IonValueUtils.nullValue();
+                }
+                nextValue = list.get(segment.arrayIndex());
+            }
             return resolvePath(nextValue, index + 1);
         }
     }
@@ -120,6 +132,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
     private static final class PathSegment {
         private final String name;
         private boolean arrayExpand;
+        private Integer arrayIndex;
 
         private PathSegment(String name) {
             this.name = name;
@@ -135,6 +148,14 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
 
         void setArrayExpand(boolean arrayExpand) {
             this.arrayExpand = arrayExpand;
+        }
+
+        Integer arrayIndex() {
+            return arrayIndex;
+        }
+
+        void setArrayIndex(Integer arrayIndex) {
+            this.arrayIndex = arrayIndex;
         }
     }
 
@@ -866,6 +887,15 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
                         segment.setArrayExpand(true);
                         continue;
                     }
+                    if (match(TokenType.NUMBER)) {
+                        String rawIndex = previous().text();
+                        if (!rawIndex.chars().allMatch(Character::isDigit)) {
+                            throw new ExpressionException("Expected integer index after '['");
+                        }
+                        consume(TokenType.RBRACKET, "Expected ']'");
+                        segment.setArrayIndex(Integer.parseInt(rawIndex));
+                        continue;
+                    }
                     if (match(TokenType.STRING)) {
                         String fieldName = previous().text();
                         consume(TokenType.RBRACKET, "Expected ']'");
@@ -873,7 +903,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
                         segments.add(segment);
                         continue;
                     }
-                    throw new ExpressionException("Expected ']' or string key after '['");
+                    throw new ExpressionException("Expected ']', string key, or numeric index after '['");
                 }
                 if (match(TokenType.DOT)) {
                     consume(TokenType.IDENT, "Expected identifier after '.'");
