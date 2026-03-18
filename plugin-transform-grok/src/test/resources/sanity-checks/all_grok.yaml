@@ -1,0 +1,34 @@
+id: all_grok
+namespace: sanitychecks.plugin-transform-grok
+
+tasks:
+  - id: write_logs
+    type: io.kestra.plugin.core.storage.Write
+    content: |
+      "2020-12-14T12:18:51.397Z INFO Hello Kestra"
+      "2020-12-14T12:18:52.000Z ERROR Something failed"
+      "this line does not match"
+    extension: .ion
+
+  - id: transform_items
+    type: io.kestra.plugin.transform.grok.TransformItems
+    from: "{{ outputs.write_logs.uri }}"
+    pattern: "%{TIMESTAMP_ISO8601:logdate} %{LOGLEVEL:loglevel} %{GREEDYDATA:message}"
+
+  - id: transform_value
+    type: io.kestra.plugin.transform.grok.TransformValue
+    from: "2020-12-14T12:18:51.397Z WARN Single line"
+    pattern: "%{TIMESTAMP_ISO8601:logdate} %{LOGLEVEL:loglevel} %{GREEDYDATA:message}"
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - "{{ outputs.transform_items.processedItemsTotal == 2 }}"
+      - "{{ fromIon(read(outputs.transform_items.uri), allRows=true) | length == 2 }}"
+      - "{{ fromIon(read(outputs.transform_items.uri), allRows=true)[1].loglevel == 'ERROR' }}"
+      - "{{ outputs.transform_value.value.loglevel == 'WARN' }}"
+      - "{{ outputs.transform_value.value.message == 'Single line' }}"
+
+finally:
+  - id: purge
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles

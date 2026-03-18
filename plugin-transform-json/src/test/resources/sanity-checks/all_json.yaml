@@ -1,0 +1,72 @@
+id: all_json
+namespace: sanitychecks.plugin-transform-json
+
+tasks:
+  - id: write_orders
+    type: io.kestra.plugin.core.storage.Write
+    content: |
+      {
+        "products": [
+          {
+            "title": "Apple",
+            "brand": "Kestra",
+            "price": 2.5
+          },
+          {
+            "title": "Banana",
+            "brand": "Kestra",
+            "price": 1.7
+          }
+        ]
+      }
+    extension: .json
+
+  - id: transform_items
+    type: io.kestra.plugin.transform.jsonata.TransformItems
+    from: "{{ outputs.write_orders.uri }}"
+    expression: |
+      products.{
+        "label": title & ' by ' & brand,
+        "price": price
+      }
+
+  - id: transform_value
+    type: io.kestra.plugin.transform.jsonata.TransformValue
+    from: |
+      {
+        "order_id": "ABC123",
+        "customer_name": "John Doe",
+        "items": [
+          {
+            "quantity": 5,
+            "price_per_unit": 0.5
+          },
+          {
+            "quantity": 3,
+            "price_per_unit": 0.3
+          },
+          {
+            "quantity": 2,
+            "price_per_unit": 0.4
+          }
+        ]
+      }
+    expression: |
+      {
+        "order_id": order_id,
+        "customer_name": customer_name,
+        "total_price": $sum(items.(quantity * price_per_unit))
+      }
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - "{{ outputs.transform_items.processedItemsTotal == 2 }}"
+      - "{{ fromIon(read(outputs.transform_items.uri), allRows=true) | length == 2 }}"
+      - "{{ fromIon(read(outputs.transform_items.uri), allRows=true)[0].label == 'Apple by Kestra' }}"
+      - "{{ outputs.transform_value.value.order_id == 'ABC123' }}"
+      - "{{ outputs.transform_value.value.total_price == 4.2 }}"
+
+finally:
+  - id: purge
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles
