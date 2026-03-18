@@ -15,7 +15,7 @@ class RunnerTest {
     @Test
     @ExecuteFlow("sanity-checks/all_grok.yaml")
     void all_grok(Execution execution) {
-        assertThat(execution.getTaskRunList(), hasSize(4));
+        assertThat(execution.getTaskRunList(), hasSize(5));
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
     }
 }
