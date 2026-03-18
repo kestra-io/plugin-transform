@@ -1,5 +1,5 @@
 id: all_records
-namespace: sanitychecks.plugin-transform-records
+namespace: malay.test
 
 tasks:
   - id: orders
@@ -9,7 +9,7 @@ tasks:
         - user:
             id: "u-1"
           createdAt: "2024-01-01T00:00:00Z"
-          status: active
+          is_active: true
           total: 120
           items:
             - sku: "A"
@@ -19,7 +19,7 @@ tasks:
         - user:
             id: "u-2"
           createdAt: "2024-01-02T00:00:00Z"
-          status: inactive
+          is_active: false
           total: 50
           items:
             - sku: "C"
@@ -40,13 +40,13 @@ tasks:
   - id: filter
     type: io.kestra.plugin.transform.Filter
     from: "{{ outputs.orders.values.records }}"
-    where: status == 'active' && total >= 100
+    where: is_active && total >= 100
 
   - id: aggregate
     type: io.kestra.plugin.transform.Aggregate
     from: "{{ outputs.orders.values.records }}"
     groupBy:
-      - status
+      - is_active
     aggregates:
       order_count:
         expr: count()
@@ -105,7 +105,7 @@ tasks:
       - "{{ outputs.aggregate.records[0].total_amount == 120 }}"
       - "{{ outputs.unnest.records | length == 3 }}"
       - "{{ outputs.unnest.records[1].item.sku == 'B' }}"
-      - "{{ outputs.select.uri starts with 'kestra://' }}"
+      - "{{ outputs.select.uri | startsWith('kestra://') }}"
       - "{{ outputs.read_selected.records[0].status == 'ok' }}"
       - "{{ outputs.zip.records[1].status == 'pending' }}"
 
