@@ -1,0 +1,114 @@
+id: all_records
+namespace: sanitychecks.plugin-transform-records
+
+tasks:
+  - id: orders
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - user:
+            id: "u-1"
+          createdAt: "2024-01-01T00:00:00Z"
+          status: active
+          total: 120
+          items:
+            - sku: "A"
+              price: 10
+            - sku: "B"
+              price: 5
+        - user:
+            id: "u-2"
+          createdAt: "2024-01-02T00:00:00Z"
+          status: inactive
+          total: 50
+          items:
+            - sku: "C"
+              price: 8
+
+  - id: map
+    type: io.kestra.plugin.transform.Map
+    from: "{{ outputs.orders.values.records }}"
+    fields:
+      customer_id: user.id
+      created_at:
+        expr: createdAt
+        type: TIMESTAMP
+      total:
+        expr: total
+        type: DECIMAL
+
+  - id: filter
+    type: io.kestra.plugin.transform.Filter
+    from: "{{ outputs.orders.values.records }}"
+    where: status == 'active' && total >= 100
+
+  - id: aggregate
+    type: io.kestra.plugin.transform.Aggregate
+    from: "{{ outputs.orders.values.records }}"
+    groupBy:
+      - status
+    aggregates:
+      order_count:
+        expr: count()
+        type: INT
+      total_amount:
+        expr: sum(total)
+        type: DECIMAL
+
+  - id: unnest
+    type: io.kestra.plugin.transform.Unnest
+    from: "{{ outputs.orders.values.records }}"
+    path: items[]
+    as: item
+
+  - id: status_lookup
+    type: io.kestra.plugin.core.output.OutputValues
+    values:
+      records:
+        - status: ok
+        - status: pending
+
+  - id: select
+    type: io.kestra.plugin.transform.Select
+    inputs:
+      - "{{ outputs.orders.values.records }}"
+      - "{{ outputs.status_lookup.values.records }}"
+    fields:
+      customer_id:
+        expr: $1.user.id
+      status:
+        expr: $2.status
+    outputType: STORE
+
+  - id: read_selected
+    type: io.kestra.plugin.transform.Map
+    from: "{{ outputs.select.uri }}"
+    outputType: RECORDS
+    fields:
+      customer_id: customer_id
+      status: status
+
+  - id: zip
+    type: io.kestra.plugin.transform.Zip
+    inputs:
+      - "{{ outputs.orders.values.records }}"
+      - "{{ outputs.status_lookup.values.records }}"
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - "{{ outputs.map.records[0].customer_id == 'u-1' }}"
+      - "{{ outputs.filter.records | length == 1 }}"
+      - "{{ outputs.filter.records[0].user.id == 'u-1' }}"
+      - "{{ outputs.aggregate.records | length == 2 }}"
+      - "{{ outputs.aggregate.records[0].order_count == 1 }}"
+      - "{{ outputs.aggregate.records[0].total_amount == 120 }}"
+      - "{{ outputs.unnest.records | length == 3 }}"
+      - "{{ outputs.unnest.records[1].item.sku == 'B' }}"
+      - "{{ outputs.select.uri starts with 'kestra://' }}"
+      - "{{ outputs.read_selected.records[0].status == 'ok' }}"
+      - "{{ outputs.zip.records[1].status == 'pending' }}"
+
+finally:
+  - id: purge
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles
