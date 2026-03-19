@@ -230,4 +230,35 @@ class AggregateTest {
             () -> Aggregate.OutputMode.from("URI")
         );
     }
+
+    @Test
+    void averageUsesRoundedDivisionWithoutTrailingZeros() throws Exception {
+        var first = java.util.Map.of(
+            "customer_id", "c1",
+            "duration", new BigDecimal("1.00")
+        );
+        var second = java.util.Map.of(
+            "customer_id", "c1",
+            "duration", new BigDecimal("1.00")
+        );
+        var third = java.util.Map.of(
+            "customer_id", "c1",
+            "duration", new BigDecimal("2.00")
+        );
+
+        var task = Aggregate.builder()
+            .from(Property.ofValue(List.of(first, second, third)))
+            .groupBy(Property.ofValue(List.of("customer_id")))
+            .aggregates(Property.ofValue(java.util.Map.of(
+                "avg_duration", Aggregate.AggregateDefinition.builder().expr("avg(duration)").build()
+            )))
+            .build();
+
+        var runContext = runContextFactory.of(java.util.Map.of());
+        var output = task.run(runContext);
+
+        assertThat(output.getRecords(), hasSize(1));
+        var row = (java.util.Map<String, Object>) output.getRecords().getFirst();
+        assertThat(row.get("avg_duration"), is(new BigDecimal("1.3333333333")));
+    }
 }

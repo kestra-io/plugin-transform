@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -139,6 +140,13 @@ import java.util.UUID;
     }
 )
 public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
+    private static final int AVG_SCALE = 10;
+
+    private static BigDecimal normalizedAverage(BigDecimal total, long count) {
+        return total.divide(BigDecimal.valueOf(count), AVG_SCALE, RoundingMode.HALF_UP)
+            .stripTrailingZeros();
+    }
+
     @NotNull
     @Schema(
         title = "Input records",
@@ -686,7 +694,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
                         yield IonValueUtils.nullValue();
                     }
                     BigDecimal total = sum == null ? BigDecimal.ZERO : sum;
-                    yield IonValueUtils.system().newDecimal(total.divide(BigDecimal.valueOf(count), java.math.RoundingMode.HALF_UP));
+                    yield IonValueUtils.system().newDecimal(normalizedAverage(total, count));
                 }
                 case FIRST -> first == null ? IonValueUtils.nullValue() : IonValueUtils.cloneValue(first);
                 case LAST -> last == null ? IonValueUtils.nullValue() : IonValueUtils.cloneValue(last);

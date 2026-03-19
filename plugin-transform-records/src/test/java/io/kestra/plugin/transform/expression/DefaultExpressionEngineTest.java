@@ -314,6 +314,60 @@ class DefaultExpressionEngineTest {
         IonValue value = engine.evaluate("items[].price", record);
         assertThat(IonValueUtils.toJavaValue(value).toString(), is("[1, null, 3]"));
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("sum(items[].price)", record)).toString(), is("4"));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("avg(items[].price)", record)).toString(), is("2"));
+    }
+
+    @Test
+    void averagesUsingFixedScaleAndIgnoresNulls() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+
+        var values = IonValueUtils.system().newEmptyList();
+        values.add(IonValueUtils.system().newInt(1));
+        values.add(IonValueUtils.nullValue());
+        values.add(IonValueUtils.system().newInt(2));
+        record.put("values", values);
+
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("avg(values)", record)).toString(), is("1.5"));
+    }
+
+    @Test
+    void returnsRoundedAverageForRepeatingDecimals() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+
+        var values = IonValueUtils.system().newEmptyList();
+        values.add(IonValueUtils.system().newInt(1));
+        values.add(IonValueUtils.system().newInt(2));
+        record.put("values", values);
+
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("avg(values)", record)).toString(), is("1.5"));
+    }
+
+    @Test
+    void returnsRoundedAverageForNonTerminatingDivision() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+
+        var values = IonValueUtils.system().newEmptyList();
+        values.add(IonValueUtils.system().newInt(1));
+        values.add(IonValueUtils.system().newInt(1));
+        values.add(IonValueUtils.system().newInt(2));
+        record.put("values", values);
+
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("avg(values)", record)).toString(), is("1.3333333333"));
+    }
+
+    @Test
+    void returnsNullForAverageWithoutNonNullValues() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+
+        var values = IonValueUtils.system().newEmptyList();
+        values.add(IonValueUtils.nullValue());
+        record.put("values", values);
+
+        assertThat(IonValueUtils.isNull(engine.evaluate("avg(values)", record)), is(true));
     }
 
     @Test

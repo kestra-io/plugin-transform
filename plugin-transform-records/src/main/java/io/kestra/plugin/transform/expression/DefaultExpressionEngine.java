@@ -9,6 +9,7 @@ import io.kestra.plugin.transform.ion.CastException;
 import io.kestra.plugin.transform.ion.IonValueUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class DefaultExpressionEngine implements ExpressionEngine {
+    private static final int AVG_SCALE = 10;
     private final java.util.Map<String, Expr> cache = new ConcurrentHashMap<>();
 
     @Override
@@ -52,6 +54,11 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
 
     private interface Expr {
         IonValue eval(EvalContext context) throws ExpressionException;
+    }
+
+    private static BigDecimal normalizedAverage(BigDecimal total, long count) {
+        return total.divide(BigDecimal.valueOf(count), AVG_SCALE, RoundingMode.HALF_UP)
+            .stripTrailingZeros();
     }
 
     private static final class LiteralExpr implements Expr {
@@ -359,6 +366,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
                 case "toboolean" -> castBoolean(values);
                 case "parsetimestamp" -> parseTimestamp(values);
                 case "sum" -> sum(values);
+                case "avg" -> avg(values);
                 case "count" -> count(values);
                 case "min" -> min(values);
                 case "max" -> max(values);
@@ -452,6 +460,30 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
                 return IonValueUtils.nullValue();
             }
             return IonValueUtils.system().newInt(list.size());
+        }
+
+        private IonValue avg(List<IonValue> values) throws ExpressionException {
+            requireArgCount(values, 1);
+            IonList list = asList(values.getFirst());
+            if (list == null || list.isEmpty()) {
+                return IonValueUtils.nullValue();
+            }
+
+            BigDecimal total = BigDecimal.ZERO;
+            int count = 0;
+            for (IonValue value : list) {
+                if (IonValueUtils.isNull(value)) {
+                    continue;
+                }
+                total = total.add(asDecimal(value));
+                count++;
+            }
+
+            if (count == 0) {
+                return IonValueUtils.nullValue();
+            }
+
+            return IonValueUtils.system().newDecimal(normalizedAverage(total, count));
         }
 
         private IonValue min(List<IonValue> values) throws ExpressionException {

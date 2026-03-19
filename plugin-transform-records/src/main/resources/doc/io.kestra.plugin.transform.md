@@ -94,6 +94,7 @@ The shared expression language supports these functions:
 - `toBoolean(value)`: convert a single scalar value to a boolean
 - `parseTimestamp(value)`: parse an Ion timestamp or an ISO-8601 timestamp string accepted by Java `Instant.parse`, such as `2024-02-01T12:00:00Z`, `2024-02-01T12:00:00.123Z`, or `2024-02-01T13:00:00+01:00`
 - `sum(values)`: aggregate numeric values from an array or expanded field path such as `items[].price`
+- `avg(values)`: return the average of numeric values from an array or expanded field path
 - `count(values)`: count values from an array or expanded field path
 - `min(values)`: return the minimum value from a comparable array or expanded field path
 - `max(values)`: return the maximum value from a comparable array or expanded field path
