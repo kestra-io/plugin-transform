@@ -49,9 +49,9 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Select records",
+    title = "Align, filter, and project records",
     description = """
-        Align multiple inputs by position, optionally filter rows, and project output records.
+        Align multiple inputs by row position, optionally filter the combined rows, and project typed output fields.
         """
 )
 @Plugin(
@@ -123,15 +123,18 @@ public class Select extends Task implements RunnableTask<Select.Output> {
     @Schema(
         title = "Filter expression",
         description = """
-        Optional boolean expression evaluated on each merged row (supports $1, $2, ...).
+        Optional boolean expression evaluated on each aligned row after the inputs are merged.
+        Supports positional references such as $1, $2, and fields from the merged row.
         """
     )
     private Property<String> where;
 
     @Schema(
-        title = "Projection mappings",
+        title = "Fields",
         description = """
-        Optional mapping of output field names to expressions and types (supports $1, $2, ...). If omitted, outputs the merged row.
+        Optional output field definitions keyed by target field name.
+        Each value can be a shorthand expression string or an object with expr, optional type, and optional.
+        If omitted, the task returns the merged row.
         """
     )
     private Property<java.util.Map<String, FieldDefinition>> fields;
@@ -139,14 +142,20 @@ public class Select extends Task implements RunnableTask<Select.Output> {
     @Schema(
         title = "Keep input fields",
         description = """
-        When fields are provided, include the selected input fields (1-based indices) in addition to projected fields.
+        When fields are provided, also merge the full fields from the selected inputs into the output row.
+        Values are 1-based input indices such as [1] or [1, 2].
         """
     )
     @Builder.Default
     private Property<List<Integer>> keepInputFields = Property.ofValue(List.of());
 
     @Builder.Default
-    @Schema(title = "Drop null fields")
+    @Schema(
+        title = "Drop null fields",
+        description = """
+        Omits output fields whose final value is null after projection and merging.
+        """
+    )
     private Property<Boolean> dropNulls = Property.ofValue(true);
 
     @Builder.Default
@@ -729,14 +738,31 @@ public class Select extends Task implements RunnableTask<Select.Output> {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class FieldDefinition {
-        @Schema(title = "Expression")
+        @Schema(
+            title = "Expression",
+            description = """
+            Expression used to compute the output field value from the merged row.
+            Supports positional references such as $1, $2, and merged row fields.
+            """
+        )
         private String expr;
 
-        @Schema(title = "Ion type")
+        @Schema(
+            title = "Output type",
+            description = """
+            Optional Ion type to cast the evaluated value to before writing the output field.
+            """
+        )
         private IonTypeName type;
 
         @Builder.Default
-        @Schema(title = "Optional")
+        @Schema(
+            title = "Optional",
+            description = """
+            When true, allows the field to be omitted when the evaluated value is null.
+            Expression and cast errors are still handled by onError.
+            """
+        )
         private boolean optional = false;
 
         @JsonCreator

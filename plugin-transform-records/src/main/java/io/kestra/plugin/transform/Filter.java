@@ -101,7 +101,7 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
     @Schema(
         title = "Filter expression",
         description = """
-        Boolean expression evaluated on each record.
+        Expression evaluated on each record and required to return true or false.
         """
     )
     private Property<String> where;
@@ -110,7 +110,7 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
     @Schema(
         title = "On error behavior",
         description = """
-        FAIL stops the task on expression errors, SKIP drops the current record, and KEEP keeps the current record.
+        FAIL stops the task on expression errors, SKIP drops the current record, and KEEP emits the original record when the filter expression fails.
         """
     )
     private Property<OnErrorMode> onError = Property.ofValue(OnErrorMode.FAIL);

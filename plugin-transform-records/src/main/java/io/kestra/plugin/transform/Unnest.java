@@ -48,9 +48,9 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Explode records",
+    title = "Flatten array fields into records",
     description = """
-        Expand array fields into multiple records without scripts.
+        Expand an array field into one record per element, optionally keeping the original fields.
         """
 )
 @Plugin(
@@ -102,7 +102,7 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
     @Schema(
         title = "Array path",
         description = """
-        Path expression to the array to explode (e.g., items[]).
+        Path expression that resolves to the array to explode, such as items[] or payload.items[].
         """
     )
     private Property<String> path;
@@ -111,7 +111,7 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
     @Schema(
         title = "Output field name",
         description = """
-        Field name that holds the exploded element.
+        Field name used for the exploded element in each output record.
         """
     )
     private Property<String> as;
@@ -120,7 +120,7 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
     @Schema(
         title = "Keep original fields",
         description = """
-        Keeps original fields other than the exploded array field.
+        Keeps the original record fields in the output row, excluding the exploded array field itself.
         """
     )
     private Property<Boolean> keepOriginalFields = Property.ofValue(true);

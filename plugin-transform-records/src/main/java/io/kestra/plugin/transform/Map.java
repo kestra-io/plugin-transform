@@ -54,9 +54,9 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Typed record mapping",
+    title = "Normalize and enrich records",
     description = """
-        Declaratively map, cast, and derive Ion fields without scripts.
+        Reshape records by selecting fields, casting types, and deriving new typed values from expressions without scripts.
         """
 )
 @Plugin(
@@ -182,9 +182,10 @@ public class Map extends Task implements RunnableTask<Map.Output> {
 
     @NotNull
     @Schema(
-        title = "Field mappings",
+        title = "Fields",
         description = """
-        Target fields with expressions and types.
+        Output field definitions keyed by target field name.
+        Each value can be a shorthand expression string or an object with expr, optional type, and optional.
         """
     )
     private Property<java.util.Map<String, FieldDefinition>> fields;
@@ -199,7 +200,12 @@ public class Map extends Task implements RunnableTask<Map.Output> {
     private Property<Boolean> keepOriginalFields = Property.ofValue(false);
 
     @Builder.Default
-    @Schema(title = "Drop null fields")
+    @Schema(
+        title = "Drop null fields",
+        description = """
+        Omits output fields whose final value is null after mapping.
+        """
+    )
     private Property<Boolean> dropNulls = Property.ofValue(true);
 
     @Builder.Default
@@ -458,14 +464,30 @@ public class Map extends Task implements RunnableTask<Map.Output> {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class FieldDefinition {
-        @Schema(title = "Expression")
+        @Schema(
+            title = "Expression",
+            description = """
+            Per-record expression used to compute the output field value.
+            """
+        )
         private String expr;
 
-        @Schema(title = "Ion type")
+        @Schema(
+            title = "Output type",
+            description = """
+            Optional type to cast the evaluated value to before writing the output field.
+            """
+        )
         private IonTypeName type;
 
         @Builder.Default
-        @Schema(title = "Optional")
+        @Schema(
+            title = "Optional",
+            description = """
+            When true, allows the field to be omitted when the evaluated value is null.
+            Expression and cast errors are still handled by onError.
+            """
+        )
         private boolean optional = false;
 
         @JsonCreator(mode = JsonCreator.Mode.DELEGATING)

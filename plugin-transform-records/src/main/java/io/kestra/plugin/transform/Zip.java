@@ -42,9 +42,9 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Zip records",
+    title = "Combine records by row position",
     description = """
-        Merge multiple record streams by position (record i with record i).
+        Merge multiple record streams row by row, combining record i from each input and resolving field conflicts.
         """
 )
 @Plugin(
@@ -95,7 +95,8 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
     @Schema(
         title = "Input records",
         description = """
-        List of two or more inputs (Ion list/struct or storage URIs) to align by row position.
+        List of two or more inputs (Ion list/struct or storage URIs) to align and merge by row position.
+        All inputs must have the same length.
         """
     )
     private List<Property<Object>> inputs;
@@ -104,7 +105,7 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
     @Schema(
         title = "On error behavior",
         description = """
-        FAIL stops the task on merge errors (such as field conflicts), SKIP drops the current row.
+        FAIL stops the task on row merge errors, and SKIP drops the current row.
         """
     )
     private Property<OnErrorMode> onError = Property.ofValue(OnErrorMode.FAIL);
@@ -113,7 +114,8 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
     @Schema(
         title = "On conflict behavior",
         description = """
-        FAIL errors on duplicate field names, LEFT keeps the first value, RIGHT overwrites with the later value.
+        Controls duplicate field names while merging a row.
+        FAIL errors, LEFT keeps the first value, and RIGHT overwrites with the later value.
         """
     )
     private Property<ConflictMode> onConflict = Property.ofValue(ConflictMode.FAIL);

@@ -53,9 +53,9 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Aggregate records",
+    title = "Aggregate records by group",
     description = """
-        Group records and compute typed aggregates.
+        Group records by one or more fields and compute typed summary values such as counts, sums, minimums, maximums, first, or last values.
         """
 )
 @Plugin(
@@ -150,7 +150,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
 
     @NotNull
     @Schema(
-        title = "Group by fields",
+        title = "Group by",
         description = """
         Fields to group on.
         """
@@ -161,7 +161,8 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
     @Schema(
         title = "Aggregate definitions",
         description = """
-        Aggregate expressions with optional types.
+        Output fields to compute for each group.
+        Each value can be a shorthand expression string or an object with expr and optional type.
         """
     )
     private Property<Map<String, AggregateDefinition>> aggregates;
@@ -527,10 +528,21 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class AggregateDefinition {
-        @Schema(title = "Expression")
+        @Schema(
+            title = "Expression",
+            description = """
+            Aggregate expression to evaluate for each group.
+            Supported forms are count(), sum(path), min(path), max(path), avg(path), first(path), and last(path).
+            """
+        )
         private String expr;
 
-        @Schema(title = "Ion type")
+        @Schema(
+            title = "Output type",
+            description = """
+            Optional type to cast the aggregate result to before writing the output field.
+            """
+        )
         private IonTypeName type;
 
         @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
