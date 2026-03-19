@@ -1,6 +1,6 @@
 @PluginSubGroup(
     title = "Transform",
-    description = "Typed record transformations for Ion data.",
+    description = "Transform typed records and Ion data by mapping, filtering, selecting, zipping, unnesting, and aggregating structured values.",
     categories = { PluginSubGroup.PluginCategory.CORE, PluginSubGroup.PluginCategory.DATA }
 )
 package io.kestra.plugin.transform;

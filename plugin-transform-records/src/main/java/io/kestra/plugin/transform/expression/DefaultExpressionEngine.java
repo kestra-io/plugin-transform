@@ -9,6 +9,7 @@ import io.kestra.plugin.transform.ion.CastException;
 import io.kestra.plugin.transform.ion.IonValueUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class DefaultExpressionEngine implements ExpressionEngine {
+    private static final int AVG_SCALE = 10;
     private final java.util.Map<String, Expr> cache = new ConcurrentHashMap<>();
 
     @Override
@@ -52,6 +54,11 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
 
     private interface Expr {
         IonValue eval(EvalContext context) throws ExpressionException;
+    }
+
+    private static BigDecimal normalizedAverage(BigDecimal total, long count) {
+        return total.divide(BigDecimal.valueOf(count), AVG_SCALE, RoundingMode.HALF_UP)
+            .stripTrailingZeros();
     }
 
     private static final class LiteralExpr implements Expr {
@@ -333,6 +340,43 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
         }
     }
 
+    private static final class InExpr implements Expr {
+        private final Expr left;
+        private final List<Expr> candidates;
+
+        private InExpr(Expr left, List<Expr> candidates) {
+            this.left = left;
+            this.candidates = candidates;
+        }
+
+        @Override
+        public IonValue eval(EvalContext context) throws ExpressionException {
+            IonValue leftValue = left.eval(context);
+            if (IonValueUtils.isNull(leftValue)) {
+                return IonValueUtils.system().newBool(false);
+            }
+
+            for (Expr candidate : candidates) {
+                IonValue candidateValue = candidate.eval(context);
+                if (equalsValue(leftValue, candidateValue)) {
+                    return IonValueUtils.system().newBool(true);
+                }
+            }
+
+            return IonValueUtils.system().newBool(false);
+        }
+
+        private boolean equalsValue(IonValue leftValue, IonValue rightValue) {
+            if (IonValueUtils.isNull(leftValue) && IonValueUtils.isNull(rightValue)) {
+                return true;
+            }
+            if (IonValueUtils.isNull(leftValue) || IonValueUtils.isNull(rightValue)) {
+                return false;
+            }
+            return leftValue.equals(rightValue);
+        }
+    }
+
     private static final class FunctionExpr implements Expr {
         private final String name;
         private final List<Expr> args;
@@ -359,6 +403,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
                 case "toboolean" -> castBoolean(values);
                 case "parsetimestamp" -> parseTimestamp(values);
                 case "sum" -> sum(values);
+                case "avg" -> avg(values);
                 case "count" -> count(values);
                 case "min" -> min(values);
                 case "max" -> max(values);
@@ -452,6 +497,30 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
                 return IonValueUtils.nullValue();
             }
             return IonValueUtils.system().newInt(list.size());
+        }
+
+        private IonValue avg(List<IonValue> values) throws ExpressionException {
+            requireArgCount(values, 1);
+            IonList list = asList(values.getFirst());
+            if (list == null || list.isEmpty()) {
+                return IonValueUtils.nullValue();
+            }
+
+            BigDecimal total = BigDecimal.ZERO;
+            int count = 0;
+            for (IonValue value : list) {
+                if (IonValueUtils.isNull(value)) {
+                    continue;
+                }
+                total = total.add(asDecimal(value));
+                count++;
+            }
+
+            if (count == 0) {
+                return IonValueUtils.nullValue();
+            }
+
+            return IonValueUtils.system().newDecimal(normalizedAverage(total, count));
         }
 
         private IonValue min(List<IonValue> values) throws ExpressionException {
@@ -600,9 +669,13 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
                 index += 2;
                 return new Token(TokenType.OR_OR, "||");
             }
-            if (current == '=' && peek('=')) {
-                index += 2;
-                return new Token(TokenType.EQ_EQ, "==");
+            if (current == '=') {
+                if (peek('=')) {
+                    index += 2;
+                    return new Token(TokenType.EQ_EQ, "==");
+                }
+                index++;
+                return new Token(TokenType.EQ_EQ, "=");
             }
             if (current == '!' && peek('=')) {
                 index += 2;
@@ -760,15 +833,23 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
         }
 
         private Expr parseEquality() throws ExpressionException {
-            Expr expr = parseComparison();
+            Expr expr = parseMembership();
             while (true) {
                 if (match(TokenType.EQ_EQ)) {
-                    expr = new BinaryExpr(expr, parseComparison(), TokenType.EQ_EQ);
+                    expr = new BinaryExpr(expr, parseMembership(), TokenType.EQ_EQ);
                 } else if (match(TokenType.NOT_EQ)) {
-                    expr = new BinaryExpr(expr, parseComparison(), TokenType.NOT_EQ);
+                    expr = new BinaryExpr(expr, parseMembership(), TokenType.NOT_EQ);
                 } else {
                     break;
                 }
+            }
+            return expr;
+        }
+
+        private Expr parseMembership() throws ExpressionException {
+            Expr expr = parseComparison();
+            while (matchIdentifier("in")) {
+                expr = new InExpr(expr, parseInCandidates());
             }
             return expr;
         }
@@ -789,6 +870,18 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
                 }
             }
             return expr;
+        }
+
+        private List<Expr> parseInCandidates() throws ExpressionException {
+            consume(TokenType.LPAREN, "Expected '(' after 'in'");
+
+            List<Expr> candidates = new ArrayList<>();
+            do {
+                candidates.add(parseOr());
+            } while (match(TokenType.COMMA));
+
+            consume(TokenType.RPAREN, "Expected ')' after 'in' values");
+            return candidates;
         }
 
         private Expr parseTerm() throws ExpressionException {
@@ -918,6 +1011,14 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
 
         private boolean match(TokenType type) throws ExpressionException {
             if (check(type)) {
+                advance();
+                return true;
+            }
+            return false;
+        }
+
+        private boolean matchIdentifier(String text) throws ExpressionException {
+            if (current.type() == TokenType.IDENT && text.equalsIgnoreCase(current.text())) {
                 advance();
                 return true;
             }

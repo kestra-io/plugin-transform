@@ -208,6 +208,8 @@ class DefaultExpressionEngineTest {
         IonStruct record = IonValueUtils.system().newEmptyStruct();
 
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("1 + 2 * 3 == 7", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("1 + 2 * 3 = 7", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("1 + 2 in (2, 3)", record)), is(true));
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("1 + 2 * 3 > 6", record)), is(true));
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("!(1 + 2 * 3 > 6)", record)), is(false));
     }
@@ -218,10 +220,40 @@ class DefaultExpressionEngineTest {
         IonStruct record = IonValueUtils.system().newEmptyStruct();
 
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("null == null", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("null = null", record)), is(true));
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("null != null", record)), is(false));
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("null == 1", record)), is(false));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("null = 1", record)), is(false));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("null in (1, null)", record)), is(false));
         assertThat(IonValueUtils.isNull(engine.evaluate("null > 1", record)), is(true));
         assertThat(IonValueUtils.isNull(engine.evaluate("1 + null", record)), is(true));
+    }
+
+    @Test
+    void supportsInOperator() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+        record.put("country", IonValueUtils.system().newString("FR"));
+        record.put("status", IonValueUtils.system().newString("trial"));
+
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("country in (\"FR\", \"DE\")", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("country in (\"US\", \"DE\")", record)), is(false));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("status in (\"active\", concat(\"tr\", \"ial\"))", record)), is(true));
+    }
+
+    @Test
+    void allowsInAsFieldName() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+        record.put("in", IonValueUtils.system().newString("FR"));
+
+        IonStruct payload = IonValueUtils.system().newEmptyStruct();
+        payload.put("in", IonValueUtils.system().newInt(1));
+        record.put("payload", payload);
+
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("in", record)), is("FR"));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("payload.in", record)), is(1L));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("payload[\"in\"]", record)), is(1L));
     }
 
     @Test
@@ -311,6 +343,60 @@ class DefaultExpressionEngineTest {
         IonValue value = engine.evaluate("items[].price", record);
         assertThat(IonValueUtils.toJavaValue(value).toString(), is("[1, null, 3]"));
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("sum(items[].price)", record)).toString(), is("4"));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("avg(items[].price)", record)).toString(), is("2"));
+    }
+
+    @Test
+    void averagesUsingFixedScaleAndIgnoresNulls() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+
+        var values = IonValueUtils.system().newEmptyList();
+        values.add(IonValueUtils.system().newInt(1));
+        values.add(IonValueUtils.nullValue());
+        values.add(IonValueUtils.system().newInt(2));
+        record.put("values", values);
+
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("avg(values)", record)).toString(), is("1.5"));
+    }
+
+    @Test
+    void returnsRoundedAverageForRepeatingDecimals() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+
+        var values = IonValueUtils.system().newEmptyList();
+        values.add(IonValueUtils.system().newInt(1));
+        values.add(IonValueUtils.system().newInt(2));
+        record.put("values", values);
+
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("avg(values)", record)).toString(), is("1.5"));
+    }
+
+    @Test
+    void returnsRoundedAverageForNonTerminatingDivision() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+
+        var values = IonValueUtils.system().newEmptyList();
+        values.add(IonValueUtils.system().newInt(1));
+        values.add(IonValueUtils.system().newInt(1));
+        values.add(IonValueUtils.system().newInt(2));
+        record.put("values", values);
+
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("avg(values)", record)).toString(), is("1.3333333333"));
+    }
+
+    @Test
+    void returnsNullForAverageWithoutNonNullValues() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+
+        var values = IonValueUtils.system().newEmptyList();
+        values.add(IonValueUtils.nullValue());
+        record.put("values", values);
+
+        assertThat(IonValueUtils.isNull(engine.evaluate("avg(values)", record)), is(true));
     }
 
     @Test
@@ -369,6 +455,7 @@ class DefaultExpressionEngineTest {
         assertInvalid(engine, record, "user[1.2]", "Expected integer index after '['");
         assertInvalid(engine, record, "sum(1 2)", "Expected ')'");
         assertInvalid(engine, record, "sum(,)", "Unexpected token");
+        assertInvalid(engine, record, "country in \"FR\"", "Expected '(' after 'in'");
         assertInvalid(engine, record, "1..2", "Invalid number literal");
         assertInvalid(engine, record, "@", "Unexpected character");
         assertInvalid(engine, record, "toInt()", "Expected 1 arguments");
