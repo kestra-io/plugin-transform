@@ -40,6 +40,11 @@
 
 This repository allows you to transform data coming from a JSON for instance.
 
+This repository contains several transformation plugins:
+* [Grok](https://github.com/kestra-io/plugin-transform/tree/main/plugin-transform-grok)
+* [JSONata](https://github.com/kestra-io/plugin-transform/tree/main/plugin-transform-json)
+* [Transform (Records)](https://github.com/kestra-io/plugin-transform/tree/main/plugin-transform-records)
+
 ![Kestra orchestrator](https://kestra.io/video.gif)
 
 ## Documentation
