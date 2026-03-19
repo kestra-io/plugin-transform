@@ -74,15 +74,17 @@ Supported literals:
 Supported operators:
 
 - boolean: `&&`, `||`, `!`
-- comparison: `==`, `=`, `!=`, `>`, `>=`, `<`, `<=`
+- comparison: `==`, `=`, `!=`, `>`, `>=`, `<`, `<=`, `in (...)`
 - arithmetic: `+`, `-`, `*`, `/`
 
 Use `==` as the primary equality operator in examples and docs. A single `=` is also accepted as an alias for equality.
+Use `in (...)` for membership checks against an explicit list of candidate values.
 
 Parentheses can be used to control precedence:
 
 - `(is_active || is_trial) && total_spent > 100`
 - `sum(items[].price) / count(items[].price)`
+- `country in ("FR", "DE", "AT")`
 
 ### Shared Functions
 

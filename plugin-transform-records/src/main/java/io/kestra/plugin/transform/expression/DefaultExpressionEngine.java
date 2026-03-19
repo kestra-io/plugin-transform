@@ -340,6 +340,43 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
         }
     }
 
+    private static final class InExpr implements Expr {
+        private final Expr left;
+        private final List<Expr> candidates;
+
+        private InExpr(Expr left, List<Expr> candidates) {
+            this.left = left;
+            this.candidates = candidates;
+        }
+
+        @Override
+        public IonValue eval(EvalContext context) throws ExpressionException {
+            IonValue leftValue = left.eval(context);
+            if (IonValueUtils.isNull(leftValue)) {
+                return IonValueUtils.system().newBool(false);
+            }
+
+            for (Expr candidate : candidates) {
+                IonValue candidateValue = candidate.eval(context);
+                if (equalsValue(leftValue, candidateValue)) {
+                    return IonValueUtils.system().newBool(true);
+                }
+            }
+
+            return IonValueUtils.system().newBool(false);
+        }
+
+        private boolean equalsValue(IonValue leftValue, IonValue rightValue) {
+            if (IonValueUtils.isNull(leftValue) && IonValueUtils.isNull(rightValue)) {
+                return true;
+            }
+            if (IonValueUtils.isNull(leftValue) || IonValueUtils.isNull(rightValue)) {
+                return false;
+            }
+            return leftValue.equals(rightValue);
+        }
+    }
+
     private static final class FunctionExpr implements Expr {
         private final String name;
         private final List<Expr> args;
@@ -796,15 +833,23 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
         }
 
         private Expr parseEquality() throws ExpressionException {
-            Expr expr = parseComparison();
+            Expr expr = parseMembership();
             while (true) {
                 if (match(TokenType.EQ_EQ)) {
-                    expr = new BinaryExpr(expr, parseComparison(), TokenType.EQ_EQ);
+                    expr = new BinaryExpr(expr, parseMembership(), TokenType.EQ_EQ);
                 } else if (match(TokenType.NOT_EQ)) {
-                    expr = new BinaryExpr(expr, parseComparison(), TokenType.NOT_EQ);
+                    expr = new BinaryExpr(expr, parseMembership(), TokenType.NOT_EQ);
                 } else {
                     break;
                 }
+            }
+            return expr;
+        }
+
+        private Expr parseMembership() throws ExpressionException {
+            Expr expr = parseComparison();
+            while (matchIdentifier("in")) {
+                expr = new InExpr(expr, parseInCandidates());
             }
             return expr;
         }
@@ -825,6 +870,18 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
                 }
             }
             return expr;
+        }
+
+        private List<Expr> parseInCandidates() throws ExpressionException {
+            consume(TokenType.LPAREN, "Expected '(' after 'in'");
+
+            List<Expr> candidates = new ArrayList<>();
+            do {
+                candidates.add(parseOr());
+            } while (match(TokenType.COMMA));
+
+            consume(TokenType.RPAREN, "Expected ')' after 'in' values");
+            return candidates;
         }
 
         private Expr parseTerm() throws ExpressionException {
@@ -954,6 +1011,14 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
 
         private boolean match(TokenType type) throws ExpressionException {
             if (check(type)) {
+                advance();
+                return true;
+            }
+            return false;
+        }
+
+        private boolean matchIdentifier(String text) throws ExpressionException {
+            if (current.type() == TokenType.IDENT && text.equalsIgnoreCase(current.text())) {
                 advance();
                 return true;
             }
