@@ -600,9 +600,13 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
                 index += 2;
                 return new Token(TokenType.OR_OR, "||");
             }
-            if (current == '=' && peek('=')) {
-                index += 2;
-                return new Token(TokenType.EQ_EQ, "==");
+            if (current == '=') {
+                if (peek('=')) {
+                    index += 2;
+                    return new Token(TokenType.EQ_EQ, "==");
+                }
+                index++;
+                return new Token(TokenType.EQ_EQ, "=");
             }
             if (current == '!' && peek('=')) {
                 index += 2;

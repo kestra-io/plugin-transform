@@ -208,6 +208,7 @@ class DefaultExpressionEngineTest {
         IonStruct record = IonValueUtils.system().newEmptyStruct();
 
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("1 + 2 * 3 == 7", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("1 + 2 * 3 = 7", record)), is(true));
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("1 + 2 * 3 > 6", record)), is(true));
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("!(1 + 2 * 3 > 6)", record)), is(false));
     }
@@ -218,8 +219,10 @@ class DefaultExpressionEngineTest {
         IonStruct record = IonValueUtils.system().newEmptyStruct();
 
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("null == null", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("null = null", record)), is(true));
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("null != null", record)), is(false));
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("null == 1", record)), is(false));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("null = 1", record)), is(false));
         assertThat(IonValueUtils.isNull(engine.evaluate("null > 1", record)), is(true));
         assertThat(IonValueUtils.isNull(engine.evaluate("1 + null", record)), is(true));
     }

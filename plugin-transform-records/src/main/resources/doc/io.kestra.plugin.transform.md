@@ -74,8 +74,10 @@ Supported literals:
 Supported operators:
 
 - boolean: `&&`, `||`, `!`
-- comparison: `==`, `!=`, `>`, `>=`, `<`, `<=`
+- comparison: `==`, `=`, `!=`, `>`, `>=`, `<`, `<=`
 - arithmetic: `+`, `-`, `*`, `/`
+
+Use `==` as the primary equality operator in examples and docs. A single `=` is also accepted as an alias for equality.
 
 Parentheses can be used to control precedence:
 
