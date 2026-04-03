@@ -111,8 +111,8 @@ class TransformValueTest {
         var task = TransformValue.builder()
             .id("test")
             .type(TransformValue.class.getName())
-            .from(Property.of(input))
-            .expression(Property.of(expression))
+            .from(Property.ofValue(input))
+            .expression(Property.ofValue(expression))
             .build();
 
         var runContext = runContextFactory.of();
