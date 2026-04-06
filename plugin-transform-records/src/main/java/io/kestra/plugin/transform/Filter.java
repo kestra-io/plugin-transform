@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -95,6 +96,7 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
         Ion list or struct to transform, or a storage URI pointing to an Ion file.
         """
     )
+    @PluginProperty(group = "main")
     private Property<Object> from;
 
     @NotNull
@@ -104,6 +106,7 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
         Expression evaluated on each record and required to return true or false.
         """
     )
+    @PluginProperty(group = "main")
     private Property<String> where;
 
     @Builder.Default
@@ -113,6 +116,7 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
         FAIL stops the task on expression errors, SKIP drops the current record, and KEEP emits the original record when the filter expression fails.
         """
     )
+    @PluginProperty(group = "advanced")
     private Property<OnErrorMode> onError = Property.ofValue(OnErrorMode.FAIL);
 
     @Builder.Default
@@ -122,6 +126,7 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
         Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step.
         """
     )
+    @PluginProperty(group = "processing")
     private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
 
     @Schema(
@@ -131,6 +136,7 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
         """
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
     @Override

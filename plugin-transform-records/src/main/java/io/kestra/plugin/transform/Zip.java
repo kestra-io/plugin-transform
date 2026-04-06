@@ -35,6 +35,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -99,6 +100,7 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
         All inputs must have the same length.
         """
     )
+    @PluginProperty(group = "main")
     private List<Property<Object>> inputs;
 
     @Builder.Default
@@ -108,6 +110,7 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
         FAIL stops the task on row merge errors, and SKIP drops the current row.
         """
     )
+    @PluginProperty(group = "advanced")
     private Property<OnErrorMode> onError = Property.ofValue(OnErrorMode.FAIL);
 
     @Builder.Default
@@ -118,6 +121,7 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
         FAIL errors, LEFT keeps the first value, and RIGHT overwrites with the later value.
         """
     )
+    @PluginProperty(group = "advanced")
     private Property<ConflictMode> onConflict = Property.ofValue(ConflictMode.FAIL);
 
     @Builder.Default
@@ -127,6 +131,7 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
         Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step.
         """
     )
+    @PluginProperty(group = "processing")
     private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
 
     @Schema(
@@ -136,6 +141,7 @@ public class Zip extends Task implements RunnableTask<Zip.Output> {
         """
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
     @Override

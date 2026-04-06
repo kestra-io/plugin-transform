@@ -19,6 +19,7 @@ import lombok.experimental.SuperBuilder;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -76,6 +77,7 @@ public class TransformValue extends Transform implements GrokInterface, Runnable
 
     @Schema(title = "The value to parse.")
     @NotNull
+    @PluginProperty(group = "main")
     private Property<String> from;
 
     /**
