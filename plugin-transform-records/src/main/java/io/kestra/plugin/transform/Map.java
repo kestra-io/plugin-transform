@@ -47,6 +47,7 @@ import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.UUID;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -178,6 +179,7 @@ public class Map extends Task implements RunnableTask<Map.Output> {
         Ion list or struct to transform, or a storage URI pointing to an Ion file.
         """
     )
+    @PluginProperty(group = "main")
     private Property<Object> from;
 
     @NotNull
@@ -197,6 +199,7 @@ public class Map extends Task implements RunnableTask<Map.Output> {
         Keeps input fields not explicitly mapped. If you map a_new: a, the original a is still kept.
         """
     )
+    @PluginProperty(group = "advanced")
     private Property<Boolean> keepOriginalFields = Property.ofValue(false);
 
     @Builder.Default
@@ -206,6 +209,7 @@ public class Map extends Task implements RunnableTask<Map.Output> {
         Omits output fields whose final value is null after mapping.
         """
     )
+    @PluginProperty(group = "advanced")
     private Property<Boolean> dropNulls = Property.ofValue(true);
 
     @Builder.Default
@@ -224,6 +228,7 @@ public class Map extends Task implements RunnableTask<Map.Output> {
         Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step.
         """
     )
+    @PluginProperty(group = "processing")
     private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
 
     @Schema(
@@ -233,6 +238,7 @@ public class Map extends Task implements RunnableTask<Map.Output> {
         """
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
     @Override
@@ -470,6 +476,7 @@ public class Map extends Task implements RunnableTask<Map.Output> {
             Per-record expression used to compute the output field value.
             """
         )
+        @PluginProperty(group = "advanced")
         private String expr;
 
         @Schema(
@@ -478,6 +485,7 @@ public class Map extends Task implements RunnableTask<Map.Output> {
             Optional type to cast the evaluated value to before writing the output field.
             """
         )
+        @PluginProperty(group = "advanced")
         private IonTypeName type;
 
         @Builder.Default
@@ -488,6 +496,7 @@ public class Map extends Task implements RunnableTask<Map.Output> {
             Expression and cast errors are still handled by onError.
             """
         )
+        @PluginProperty(group = "advanced")
         private boolean optional = false;
 
         @JsonCreator(mode = JsonCreator.Mode.DELEGATING)

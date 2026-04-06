@@ -9,9 +9,11 @@ public interface JSONataInterface {
 
     @Schema(title = "The JSONata expression to apply on the JSON object.")
     @NotNull
+    @PluginProperty(group = "main")
     Property<String> getExpression();
 
     @Schema(title = "The maximum number of recursive calls allowed for the JSONata transformation.")
     @NotNull
+    @PluginProperty(group = "main")
     Property<Integer> getMaxDepth();
 }

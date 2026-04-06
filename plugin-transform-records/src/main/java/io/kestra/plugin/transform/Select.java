@@ -42,6 +42,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -118,6 +119,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
         List of one or more inputs (Ion list/struct or storage URIs) to align by row position.
         """
     )
+    @PluginProperty(group = "main")
     private List<Property<Object>> inputs;
 
     @Schema(
@@ -127,6 +129,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
         Supports positional references such as $1, $2, and fields from the merged row.
         """
     )
+    @PluginProperty(group = "advanced")
     private Property<String> where;
 
     @Schema(
@@ -147,6 +150,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
         """
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<List<Integer>> keepInputFields = Property.ofValue(List.of());
 
     @Builder.Default
@@ -156,6 +160,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
         Omits output fields whose final value is null after projection and merging.
         """
     )
+    @PluginProperty(group = "advanced")
     private Property<Boolean> dropNulls = Property.ofValue(true);
 
     @Builder.Default
@@ -165,6 +170,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
         FAIL errors when input lengths differ. SKIP processes aligned rows only and stops at the shortest input.
         """
     )
+    @PluginProperty(group = "advanced")
     private Property<OnLengthMismatchMode> onLengthMismatch = Property.ofValue(OnLengthMismatchMode.FAIL);
 
     @Builder.Default
@@ -174,6 +180,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
         FAIL stops the task on row errors, SKIP drops the current row, and KEEP emits the merged input row.
         """
     )
+    @PluginProperty(group = "advanced")
     private Property<OnErrorMode> onError = Property.ofValue(OnErrorMode.FAIL);
 
     @Builder.Default
@@ -183,6 +190,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
         Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step.
         """
     )
+    @PluginProperty(group = "processing")
     private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
 
     @Schema(
@@ -192,6 +200,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
         """
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
     @Override
@@ -745,6 +754,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
             Supports positional references such as $1, $2, and merged row fields.
             """
         )
+        @PluginProperty(group = "advanced")
         private String expr;
 
         @Schema(
@@ -753,6 +763,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
             Optional Ion type to cast the evaluated value to before writing the output field.
             """
         )
+        @PluginProperty(group = "advanced")
         private IonTypeName type;
 
         @Builder.Default
@@ -763,6 +774,7 @@ public class Select extends Task implements RunnableTask<Select.Output> {
             Expression and cast errors are still handled by onError.
             """
         )
+        @PluginProperty(group = "advanced")
         private boolean optional = false;
 
         @JsonCreator

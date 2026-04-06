@@ -90,6 +90,7 @@ public class TransformValue extends Transform<TransformValue.Output> implements 
         description = "Must be a valid JSON string."
     )
     @NotNull
+    @PluginProperty(group = "main")
     private Property<String> from;
 
 

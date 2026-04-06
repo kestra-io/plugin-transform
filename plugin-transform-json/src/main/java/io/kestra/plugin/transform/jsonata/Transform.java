@@ -33,7 +33,7 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
 
     private static final ObjectMapper MAPPER = JacksonMapper.ofJson();
 
-    @PluginProperty(language = MonacoLanguages.JAVASCRIPT)
+    @PluginProperty(language = MonacoLanguages.JAVASCRIPT, group = "advanced")
     private Property<String> expression;
 
     @Builder.Default

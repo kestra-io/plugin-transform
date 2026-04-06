@@ -100,7 +100,7 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
         description = "Must be a `kestra://` internal storage URI."
     )
     @NotNull
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Schema(
@@ -109,6 +109,7 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
     )
     @NotNull
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<Boolean> explodeArray = Property.ofValue(true);
 
     /**

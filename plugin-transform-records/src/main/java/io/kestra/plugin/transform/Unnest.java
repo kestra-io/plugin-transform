@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -96,6 +97,7 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
         Ion list or struct to transform, or a storage URI pointing to an Ion file.
         """
     )
+    @PluginProperty(group = "main")
     private Property<Object> from;
 
     @NotNull
@@ -105,6 +107,7 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
         Path expression that resolves to the array to explode, such as items[] or payload.items[].
         """
     )
+    @PluginProperty(group = "main")
     private Property<String> path;
 
     @NotNull
@@ -114,6 +117,7 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
         Field name used for the exploded element in each output record.
         """
     )
+    @PluginProperty(group = "main")
     private Property<String> as;
 
     @Builder.Default
@@ -123,6 +127,7 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
         Keeps the original record fields in the output row, excluding the exploded array field itself.
         """
     )
+    @PluginProperty(group = "advanced")
     private Property<Boolean> keepOriginalFields = Property.ofValue(true);
 
     @Builder.Default
@@ -141,6 +146,7 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
         Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step.
         """
     )
+    @PluginProperty(group = "processing")
     private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
 
     @Schema(
@@ -150,6 +156,7 @@ public class Unnest extends Task implements RunnableTask<Unnest.Output> {
         """
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
     @Override

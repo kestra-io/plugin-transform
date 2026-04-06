@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Locale;
 import java.util.UUID;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -154,6 +155,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
         Ion list or struct to transform, or a storage URI pointing to an Ion file.
         """
     )
+    @PluginProperty(group = "main")
     private Property<Object> from;
 
     @NotNull
@@ -163,6 +165,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
         Fields to group on.
         """
     )
+    @PluginProperty(group = "main")
     private Property<List<String>> groupBy;
 
     @NotNull
@@ -173,6 +176,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
         Each value can be a shorthand expression string or an object with expr and optional type.
         """
     )
+    @PluginProperty(group = "main")
     private Property<Map<String, AggregateDefinition>> aggregates;
 
     @Builder.Default
@@ -191,6 +195,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
         Experimental: TEXT or BINARY. Only transform tasks can read binary Ion. Use TEXT as the final step.
         """
     )
+    @PluginProperty(group = "processing")
     private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
 
     @Schema(
@@ -200,6 +205,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
         """
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
     @Override
@@ -543,6 +549,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
             Supported forms are count(), sum(path), min(path), max(path), avg(path), first(path), and last(path).
             """
         )
+        @PluginProperty(group = "advanced")
         private String expr;
 
         @Schema(
@@ -551,6 +558,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
             Optional type to cast the aggregate result to before writing the output field.
             """
         )
+        @PluginProperty(group = "advanced")
         private IonTypeName type;
 
         @JsonCreator(mode = JsonCreator.Mode.DELEGATING)

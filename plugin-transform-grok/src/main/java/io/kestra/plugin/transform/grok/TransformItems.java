@@ -76,7 +76,7 @@ public class TransformItems extends Transform implements GrokInterface, Runnable
         description = "Must be a `kestra://` internal storage URI."
     )
     @NotNull
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     /**
