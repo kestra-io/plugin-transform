@@ -153,14 +153,14 @@ class MapFlowTest {
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
 
         TaskRun selectRun = execution.findTaskRunsByTaskId("select").getFirst();
-        Map<String, Object> selectOutputs = (Map<String, Object>) selectRun.getOutputs();
+        Map<String, Object> selectOutputs = (Map<String, Object>) outputsOf(selectRun);
         assertThat(selectOutputs.containsKey("records"), is(false));
         Object uri = selectOutputs.get("uri");
         assertThat(uri != null, is(true));
         assertThat(uri.toString().startsWith("kestra://"), is(true));
 
         TaskRun readBackRun = execution.findTaskRunsByTaskId("read_back").getFirst();
-        Map<String, Object> readBackOutputs = (Map<String, Object>) readBackRun.getOutputs();
+        Map<String, Object> readBackOutputs = (Map<String, Object>) outputsOf(readBackRun);
         List<Map<String, Object>> records = (List<Map<String, Object>>) readBackOutputs.get("records");
         assertThat(records, hasSize(2));
         assertThat(((Number) records.getFirst().get("a")).longValue(), is(1L));
@@ -175,7 +175,7 @@ class MapFlowTest {
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
 
         TaskRun selectRun = execution.findTaskRunsByTaskId("select").getFirst();
-        Map<String, Object> selectOutputs = (Map<String, Object>) selectRun.getOutputs();
+        Map<String, Object> selectOutputs = (Map<String, Object>) outputsOf(selectRun);
         Object uri = selectOutputs.get("uri");
         assertThat(uri != null, is(true));
         assertThat(uri.toString().startsWith("kestra://"), is(true));
