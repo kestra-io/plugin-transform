@@ -1,10 +1,13 @@
 package io.kestra.plugin.transform;
 
+import io.kestra.core.exceptions.InternalException;
 import io.kestra.core.junit.annotations.ExecuteFlow;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.executions.TaskRun;
 import io.kestra.core.models.flows.State;
+import io.kestra.core.services.TaskOutputService;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -16,6 +19,9 @@ import static org.hamcrest.Matchers.hasSize;
 
 @KestraTest(startRunner = true)
 class MapFlowTest {
+    @Inject
+    private TaskOutputService taskOutputService;
+
     @Test
     @ExecuteFlow("flows/map_flow.yaml")
     void executesFlow(Execution execution) {
@@ -23,7 +29,7 @@ class MapFlowTest {
 
         List<TaskRun> taskRuns = execution.findTaskRunsByTaskId("map");
         TaskRun taskRun = taskRuns.getFirst();
-        Map<String, Object> outputs = (Map<String, Object>) taskRun.getOutputs();
+        Map<String, Object> outputs = outputsOf(taskRun);
         List<Map<String, Object>> records = (List<Map<String, Object>>) outputs.get("records");
 
         assertThat(records.size(), is(1));
@@ -35,12 +41,12 @@ class MapFlowTest {
 
     @Test
     @ExecuteFlow("flows/map_flow_store.yaml")
-    void executesStoreFlow(Execution execution) {
+    void executesStoreFlow(Execution execution) throws InternalException {
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
 
         List<TaskRun> taskRuns = execution.findTaskRunsByTaskId("map");
         TaskRun taskRun = taskRuns.getFirst();
-        Map<String, Object> outputs = (Map<String, Object>) taskRun.getOutputs();
+        Map<String, Object> outputs = outputsOf(taskRun);
 
         assertThat(outputs.containsKey("records"), is(false));
         Object uri = outputs.get("uri");
@@ -55,7 +61,7 @@ class MapFlowTest {
 
         List<TaskRun> taskRuns = execution.findTaskRunsByTaskId("explode");
         TaskRun taskRun = taskRuns.getFirst();
-        Map<String, Object> outputs = (Map<String, Object>) taskRun.getOutputs();
+        Map<String, Object> outputs = outputsOf(taskRun);
 
         assertThat(outputs.containsKey("records"), is(false));
         Object uri = outputs.get("uri");
@@ -70,7 +76,7 @@ class MapFlowTest {
 
         List<TaskRun> taskRuns = execution.findTaskRunsByTaskId("filter");
         TaskRun taskRun = taskRuns.getFirst();
-        Map<String, Object> outputs = (Map<String, Object>) taskRun.getOutputs();
+        Map<String, Object> outputs = outputsOf(taskRun);
 
         assertThat(outputs.containsKey("records"), is(false));
         Object uri = outputs.get("uri");
@@ -85,7 +91,7 @@ class MapFlowTest {
 
         List<TaskRun> taskRuns = execution.findTaskRunsByTaskId("aggregate");
         TaskRun taskRun = taskRuns.getFirst();
-        Map<String, Object> outputs = (Map<String, Object>) taskRun.getOutputs();
+        Map<String, Object> outputs = outputsOf(taskRun);
 
         assertThat(outputs.containsKey("records"), is(false));
         Object uri = outputs.get("uri");
@@ -100,7 +106,7 @@ class MapFlowTest {
 
         List<TaskRun> taskRuns = execution.findTaskRunsByTaskId("zip");
         TaskRun taskRun = taskRuns.getFirst();
-        Map<String, Object> outputs = (Map<String, Object>) taskRun.getOutputs();
+        Map<String, Object> outputs = outputsOf(taskRun);
         List<Map<String, Object>> records = (List<Map<String, Object>>) outputs.get("records");
 
         assertThat(records.size(), is(2));
@@ -116,7 +122,7 @@ class MapFlowTest {
 
         List<TaskRun> taskRuns = execution.findTaskRunsByTaskId("zip");
         TaskRun taskRun = taskRuns.getFirst();
-        Map<String, Object> outputs = (Map<String, Object>) taskRun.getOutputs();
+        Map<String, Object> outputs = outputsOf(taskRun);
 
         assertThat(outputs.containsKey("records"), is(false));
         Object uri = outputs.get("uri");
@@ -130,7 +136,7 @@ class MapFlowTest {
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
 
         TaskRun taskRun = execution.findTaskRunsByTaskId("select").getFirst();
-        Map<String, Object> outputs = (Map<String, Object>) taskRun.getOutputs();
+        Map<String, Object> outputs = outputsOf(taskRun);
         List<Map<String, Object>> records = (List<Map<String, Object>>) outputs.get("records");
 
         assertThat(records, hasSize(1));
@@ -175,7 +181,7 @@ class MapFlowTest {
         assertThat(uri.toString().startsWith("kestra://"), is(true));
 
         TaskRun readBackRun = execution.findTaskRunsByTaskId("read_back").getFirst();
-        Map<String, Object> readBackOutputs = (Map<String, Object>) readBackRun.getOutputs();
+        Map<String, Object> readBackOutputs = outputsOf(readBackRun);
         List<Map<String, Object>> records = (List<Map<String, Object>>) readBackOutputs.get("records");
         assertThat(records, hasSize(1));
         assertThat(((Number) records.getFirst().get("a")).longValue(), is(1L));
@@ -188,7 +194,7 @@ class MapFlowTest {
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
 
         TaskRun taskRun = execution.findTaskRunsByTaskId("select").getFirst();
-        Map<String, Object> outputs = (Map<String, Object>) taskRun.getOutputs();
+        Map<String, Object> outputs = outputsOf(taskRun);
         List<Map<String, Object>> records = (List<Map<String, Object>>) outputs.get("records");
 
         assertThat(records, hasSize(1));
@@ -202,10 +208,18 @@ class MapFlowTest {
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
 
         TaskRun taskRun = execution.findTaskRunsByTaskId("select").getFirst();
-        Map<String, Object> outputs = (Map<String, Object>) taskRun.getOutputs();
+        Map<String, Object> outputs = outputsOf(taskRun);
         List<Map<String, Object>> records = (List<Map<String, Object>>) outputs.get("records");
 
         assertThat(records, hasSize(1));
         assertThat(records.getFirst().get("total_spent"), is("not-a-number"));
+    }
+
+    protected Map<String, Object> outputsOf(TaskRun taskRun) {
+        try {
+            return taskOutputService.getOutputs(taskRun);
+        } catch (InternalException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
