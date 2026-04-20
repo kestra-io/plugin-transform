@@ -18,7 +18,7 @@ tasks.withType(JavaCompile) {
     options.compilerArgs.add("-parameters")
 }
 
-final targetJavaVersion = JavaVersion.VERSION_21
+final targetJavaVersion = JavaVersion.VERSION_25
 group "io.kestra.plugin"
 
 allprojects {
@@ -121,6 +121,7 @@ subprojects {
         testImplementation group: "io.kestra", name: "repository-memory", version: kestraVersion
         testImplementation group: "io.kestra", name: "runner-memory", version: kestraVersion
         testImplementation group: "io.kestra", name: "storage-local", version: kestraVersion
+        testImplementation group: "io.kestra", name: "indexer", version: kestraVersion
 
         // test
         testImplementation "org.junit.jupiter:junit-jupiter-engine"
