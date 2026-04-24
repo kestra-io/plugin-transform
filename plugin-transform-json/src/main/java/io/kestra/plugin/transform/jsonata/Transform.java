@@ -39,16 +39,13 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
     @Builder.Default
     private Property<Integer> maxDepth = Property.ofValue(200);
 
-    @Getter(AccessLevel.NONE)
-    private String parsedExpressionSource;
-
-    @Getter(AccessLevel.NONE)
+    @Getter(AccessLevel.PRIVATE)
     private Jsonata parsedExpression;
 
     public void init(RunContext runContext) throws Exception {
-        this.parsedExpressionSource = runContext.render(this.expression).as(String.class).orElseThrow();
+        var exprString = runContext.render(this.expression).as(String.class).orElseThrow();
         try {
-            this.parsedExpression = jsonata(this.parsedExpressionSource);
+            this.parsedExpression = jsonata(exprString);
         } catch (JException e) {
             throw new IllegalArgumentException("Invalid JSONata expression. Error: " + e.getMessage(), e);
         }
@@ -72,15 +69,6 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
             return MAPPER.valueToTree(result);
         } catch (JException | IllegalVariableEvaluationException e) {
             throw new RuntimeException("Failed to evaluate expression", e);
-        } catch (StackOverflowError e) {
-            // Jsonata instance has mutable fields (errors, environment) that may be in a partial state
-            // after overflow. Re-parse to get a clean instance so subsequent evaluations are unaffected.
-            try {
-                this.parsedExpression = jsonata(this.parsedExpressionSource);
-            } catch (JException ignored) {
-                // expression was valid before; ignore re-parse failure
-            }
-            throw new RuntimeException("JSONata expression exceeded JVM stack depth — reduce expression complexity or lower maxDepth", e);
         }
     }
 }
