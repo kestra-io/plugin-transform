@@ -138,26 +138,28 @@ class TransformValueTest {
     // Regression tests for https://github.com/dashjoin/jsonata-java/pull/107
     //
     // Frame.lookup() was recursive — each JSONata recursive call adds a scope frame, and lookup()
-    // recurses once per frame when resolving a variable. With maxDepth=1000 (old default), a
-    // 999-deep recursive expression causes lookup() to recurse 999 levels on top of JSONata's own
-    // eval stack, overflowing before maxDepth fires.
+    // recurses once per frame when resolving a variable. With a high maxDepth, a deeply recursive
+    // expression overflows the JVM thread stack before maxDepth fires.
     //
-    // The test JVM is configured with -Xss256k (see build.gradle) to match the Windows default
-    // thread stack size where the crash was first observed in production.
+    // Production crash: Windows worker default stack ~256 KB, crashed at depth=999.
+    // Linux default stack is ~512 KB–1 MB; higher depth is needed to reproduce.
+    // Depths below are chosen to reliably overflow any default JVM thread stack up to ~1 MB
+    // without requiring -Xss flags (which OpenJDK on Linux 64-bit silently rounds up past 256 KB).
     //
     // Once dashjoin/jsonata-java#107 is merged and the dependency is bumped, both assertions
     // should flip from isInstanceOf(StackOverflowError.class) to not throwing at all.
 
     @Test
     void shouldThrowStackOverflowWithDeepRecursionOnWindowsStack() throws Exception {
-        // depth=999, maxDepth=1000: lookup() recurses 999 levels, overflows -Xss256k stack.
+        // Windows default ~256 KB: historically crashed at depth=999.
+        // depth=4999 ensures the crash is also reproducible on Linux CI (default stack ~512 KB–1 MB).
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
             .expression(Property.ofValue(
-                "($f := function($n) { $n > 0 ? $f($n - 1) : 0 }; $f(999))"
+                "($f := function($n) { $n > 0 ? $f($n - 1) : 0 }; $f(4999))"
             ))
-            .maxDepth(Property.ofValue(1000))
+            .maxDepth(Property.ofValue(5000))
             .build();
 
         assertThatThrownBy(() -> task.run(runContext))
@@ -166,14 +168,14 @@ class TransformValueTest {
 
     @Test
     void shouldThrowStackOverflowWithDeepRecursionOnLinuxStack() throws Exception {
-        // Same crash on Linux when worker is launched with -Xss256k (e.g. constrained container).
+        // depth=9999 ensures overflow even on a 1 MB default thread stack (~150 bytes/frame × 9999 ≈ 1.5 MB).
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
             .expression(Property.ofValue(
-                "($f := function($n) { $n > 0 ? $f($n - 1) : 0 }; $f(1999))"
+                "($f := function($n) { $n > 0 ? $f($n - 1) : 0 }; $f(9999))"
             ))
-            .maxDepth(Property.ofValue(2000))
+            .maxDepth(Property.ofValue(10000))
             .build();
 
         assertThatThrownBy(() -> task.run(runContext))

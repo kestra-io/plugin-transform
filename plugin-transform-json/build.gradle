@@ -1,12 +1,5 @@
 project.description = 'Kestra Plugin Transformation for Json.'
 
-// Run tests with -Xss256k to match the Windows JVM default thread stack size where the
-// StackOverflowError crash was observed (https://github.com/dashjoin/jsonata-java/pull/107).
-// Root build.gradle uses jvmArgs append (not =) so this safely extends the Allure agent arg.
-test {
-    jvmArgs '-Xss256k'
-}
-
 jar {
     manifest {
         attributes(
