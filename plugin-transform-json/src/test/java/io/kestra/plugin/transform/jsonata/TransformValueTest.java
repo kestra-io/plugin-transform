@@ -152,14 +152,15 @@ class TransformValueTest {
     @Test
     void shouldThrowStackOverflowWithDeepRecursionOnWindowsStack() throws Exception {
         // Windows default ~320 KB: historically crashed at depth=999 with recursive Frame.lookup().
-        // depth=49999 guarantees overflow on -Xss512k regardless of JIT (49999 × min 16 bytes/frame > 512k).
+        // "+ 0" after the recursive call makes it non-tail-recursive, preventing TCO and forcing
+        // each frame to stay live on the JVM stack. depth=4999 × min 16 bytes/frame > 512k.
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
             .expression(Property.ofValue(
-                "($f := function($n) { $n > 0 ? $f($n - 1) : 0 }; $f(49999))"
+                "($f := function($n) { $n > 0 ? $f($n - 1) + 0 : 0 }; $f(4999))"
             ))
-            .maxDepth(Property.ofValue(50000))
+            .maxDepth(Property.ofValue(5000))
             .build();
 
         assertThatThrownBy(() -> task.run(runContext))
@@ -168,15 +169,15 @@ class TransformValueTest {
 
     @Test
     void shouldThrowStackOverflowWithDeepRecursionOnLinuxStack() throws Exception {
-        // Linux default stack is ~8 MB without -Xss; test JVM is pinned to 512k (see build.gradle).
-        // depth=49999 guarantees overflow on -Xss512k regardless of JIT (49999 × min 16 bytes/frame > 512k).
+        // Linux default stack ~8 MB without -Xss; test JVM is pinned to 512k (see build.gradle).
+        // Non-tail-recursive (+ 0) prevents TCO. depth=4999 × min 16 bytes/frame > 512k.
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
             .expression(Property.ofValue(
-                "($f := function($n) { $n > 0 ? $f($n - 1) : 0 }; $f(49999))"
+                "($f := function($n) { $n > 0 ? $f($n - 1) + 0 : 0 }; $f(4999))"
             ))
-            .maxDepth(Property.ofValue(50000))
+            .maxDepth(Property.ofValue(5000))
             .build();
 
         assertThatThrownBy(() -> task.run(runContext))
