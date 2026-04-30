@@ -142,18 +142,16 @@ class TransformValueTest {
     // expression overflows the JVM thread stack before maxDepth fires.
     //
     // Production crash: Windows worker default stack ~256 KB, crashed at depth=999.
-    // Linux default stack is ~512 KB–1 MB; higher depth is needed to reproduce.
-    // Depths below are chosen to reliably overflow any default JVM thread stack up to ~1 MB
-    // without requiring -Xss flags (which OpenJDK on Linux 64-bit silently rounds up past 256 KB).
+    // Test JVM is pinned to -Xss512k (see build.gradle) to reproduce on Linux CI.
+    // "+ 0" makes the expression non-tail-recursive, preventing jsonata-java TCO and forcing
+    // each frame to stay live on the JVM stack so the overflow actually happens.
     //
-    // Once dashjoin/jsonata-java#107 is merged and the dependency is bumped, both assertions
-    // should flip from isInstanceOf(StackOverflowError.class) to not throwing at all.
+    // These tests currently FAIL (StackOverflowError thrown = bug present).
+    // They will PASS once dashjoin/jsonata-java#107 is merged and the dependency is bumped
+    // (iterative lookup = no stack growth = no overflow = permanent regression guard).
 
     @Test
     void shouldThrowStackOverflowWithDeepRecursionOnWindowsStack() throws Exception {
-        // Windows default ~320 KB: historically crashed at depth=999 with recursive Frame.lookup().
-        // "+ 0" after the recursive call makes it non-tail-recursive, preventing TCO and forcing
-        // each frame to stay live on the JVM stack. depth=4999 × min 16 bytes/frame > 512k.
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
@@ -169,8 +167,6 @@ class TransformValueTest {
 
     @Test
     void shouldThrowStackOverflowWithDeepRecursionOnLinuxStack() throws Exception {
-        // Linux default stack ~8 MB without -Xss; test JVM is pinned to 512k (see build.gradle).
-        // Non-tail-recursive (+ 0) prevents TCO. depth=4999 × min 16 bytes/frame > 512k.
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
