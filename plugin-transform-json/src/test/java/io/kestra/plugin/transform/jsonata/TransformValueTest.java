@@ -143,11 +143,16 @@ class TransformValueTest {
     // 999-deep recursive expression causes lookup() to recurse 999 levels on top of JSONata's own
     // eval stack, overflowing the thread stack before maxDepth fires.
     //
-    // Windows JVM default thread stack is ~256 KB; Linux is ~512 KB. Both are reproduced here
-    // via Thread(stackSize) without requiring -Xss JVM flags in build config.
-    private static final long SMALL_STACK_BYTES = 256 * 1024L;
+    // Thread(stackSize) pins the thread to a specific stack size, equivalent to -Xss on that thread,
+    // without requiring a JVM flag in build config or CI.
+    //
+    // Once dashjoin/jsonata-java#107 is merged and the dependency is bumped, both assertions
+    // should flip from isInstanceOf(StackOverflowError.class) to isNull().
 
-    private void runOnSmallStack(TransformValue task, RunContext runContext) throws InterruptedException {
+    /** Equivalent to -Xss256k — matches Windows JVM default thread stack size. */
+    private static final long XSS_256K = 256 * 1024L;
+
+    private Throwable runOnStack(long stackBytes, TransformValue task, RunContext runContext) throws InterruptedException {
         AtomicReference<Throwable> thrown = new AtomicReference<>();
         Thread t = new Thread(null, () -> {
             try {
@@ -155,17 +160,15 @@ class TransformValueTest {
             } catch (Throwable e) {
                 thrown.set(e);
             }
-        }, "small-stack-sim", SMALL_STACK_BYTES);
+        }, "stack-sim", stackBytes);
         t.start();
         t.join();
-        assertThat(thrown.get())
-            .as("StackOverflowError on %d KB stack — requires iterative Frame.lookup() fix", SMALL_STACK_BYTES / 1024)
-            .isNull();
+        return thrown.get();
     }
 
     @Test
-    void shouldNotCrashWithDeepRecursionOnWindowsStack() throws Exception {
-        // Simulates Windows JVM default (~256 KB): crashes at depth=999 with recursive lookup().
+    void shouldThrowStackOverflowWithDeepRecursionOnWindowsStack() throws Exception {
+        // Windows default stack ~256 KB (-Xss256k): depth=999 overflows before maxDepth fires.
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
@@ -175,12 +178,13 @@ class TransformValueTest {
             .maxDepth(Property.ofValue(1000))
             .build();
 
-        runOnSmallStack(task, runContext);
+        assertThat(runOnStack(XSS_256K, task, runContext))
+            .isInstanceOf(StackOverflowError.class);
     }
 
     @Test
-    void shouldNotCrashWithDeepRecursionOnLinuxStack() throws Exception {
-        // Simulates a Linux worker explicitly launched with -Xss256k (e.g. constrained container).
+    void shouldThrowStackOverflowWithDeepRecursionOnLinuxStack() throws Exception {
+        // Linux workers can be constrained to -Xss256k in containers; higher depth still overflows.
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
@@ -190,6 +194,7 @@ class TransformValueTest {
             .maxDepth(Property.ofValue(2000))
             .build();
 
-        runOnSmallStack(task, runContext);
+        assertThat(runOnStack(XSS_256K, task, runContext))
+            .isInstanceOf(StackOverflowError.class);
     }
 }
