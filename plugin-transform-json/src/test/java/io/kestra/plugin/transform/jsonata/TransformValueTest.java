@@ -10,6 +10,8 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @KestraTest
@@ -132,5 +134,66 @@ class TransformValueTest {
         assertThat(result.get(0).get(2).asText()).isEqualTo("8796977843745/8796995341857/8796999798305");
         assertThat(result.get(1).isArray()).isTrue();
         assertThat(result.get(1).get(2).asText()).isEqualTo("8796977843745/8796995341857/8796999765537");
+    }
+
+    // Regression tests for https://github.com/dashjoin/jsonata-java/pull/107
+    // Frame.lookup() was recursive — each JSONata recursive call adds one frame, so lookup()
+    // recurses once per frame. On small stacks this causes StackOverflowError before JSONata's
+    // own maxDepth guard can fire.
+
+    @Test
+    void shouldNotCrashWithDeepRecursionOnWindowsStack() throws InterruptedException {
+        // Windows JVM default thread stack ~256 KB; crashes at depth=999 before the fix.
+        RunContext runContext = runContextFactory.of();
+        TransformValue task = TransformValue.builder()
+            .from(Property.ofValue("{}"))
+            .expression(Property.ofValue(
+                "($f := function($n) { $n > 0 ? $f($n - 1) : 0 }; $f(999))"
+            ))
+            .maxDepth(Property.ofValue(1000))
+            .build();
+
+        AtomicReference<Throwable> thrown = new AtomicReference<>();
+        Thread t = new Thread(null, () -> {
+            try {
+                task.run(runContext);
+            } catch (Throwable e) {
+                thrown.set(e);
+            }
+        }, "windows-stack-sim", 256 * 1024);
+        t.start();
+        t.join();
+
+        assertThat(thrown.get())
+            .as("StackOverflowError on 256 KB stack (Windows default) — requires iterative Frame.lookup()")
+            .isNull();
+    }
+
+    @Test
+    void shouldNotCrashWithDeepRecursionOnLinuxStack() throws InterruptedException {
+        // Linux JVM default thread stack ~512 KB; needs higher depth to overflow than Windows.
+        RunContext runContext = runContextFactory.of();
+        TransformValue task = TransformValue.builder()
+            .from(Property.ofValue("{}"))
+            .expression(Property.ofValue(
+                "($f := function($n) { $n > 0 ? $f($n - 1) : 0 }; $f(1999))"
+            ))
+            .maxDepth(Property.ofValue(2000))
+            .build();
+
+        AtomicReference<Throwable> thrown = new AtomicReference<>();
+        Thread t = new Thread(null, () -> {
+            try {
+                task.run(runContext);
+            } catch (Throwable e) {
+                thrown.set(e);
+            }
+        }, "linux-stack-sim", 512 * 1024);
+        t.start();
+        t.join();
+
+        assertThat(thrown.get())
+            .as("StackOverflowError on 512 KB stack (Linux default) — requires iterative Frame.lookup()")
+            .isNull();
     }
 }
