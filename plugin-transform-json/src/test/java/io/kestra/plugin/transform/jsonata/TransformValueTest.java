@@ -137,13 +137,35 @@ class TransformValueTest {
     }
 
     // Regression tests for https://github.com/dashjoin/jsonata-java/pull/107
-    // Frame.lookup() was recursive — each JSONata recursive call adds one frame, so lookup()
-    // recurses once per frame. On small stacks this causes StackOverflowError before JSONata's
-    // own maxDepth guard can fire.
+    //
+    // Frame.lookup() was recursive — each JSONata recursive call adds a scope frame, and lookup()
+    // recurses once per frame when resolving a variable. With maxDepth=1000 (old default), a
+    // 999-deep recursive expression causes lookup() to recurse 999 levels on top of JSONata's own
+    // eval stack, overflowing the thread stack before maxDepth fires.
+    //
+    // Windows JVM default thread stack is ~256 KB; Linux is ~512 KB. Both are reproduced here
+    // via Thread(stackSize) without requiring -Xss JVM flags in build config.
+    private static final long SMALL_STACK_BYTES = 256 * 1024L;
+
+    private void runOnSmallStack(TransformValue task, RunContext runContext) throws InterruptedException {
+        AtomicReference<Throwable> thrown = new AtomicReference<>();
+        Thread t = new Thread(null, () -> {
+            try {
+                task.run(runContext);
+            } catch (Throwable e) {
+                thrown.set(e);
+            }
+        }, "small-stack-sim", SMALL_STACK_BYTES);
+        t.start();
+        t.join();
+        assertThat(thrown.get())
+            .as("StackOverflowError on %d KB stack — requires iterative Frame.lookup() fix", SMALL_STACK_BYTES / 1024)
+            .isNull();
+    }
 
     @Test
-    void shouldNotCrashWithDeepRecursionOnWindowsStack() throws InterruptedException {
-        // Windows JVM default thread stack ~256 KB; crashes at depth=999 before the fix.
+    void shouldNotCrashWithDeepRecursionOnWindowsStack() throws Exception {
+        // Simulates Windows JVM default (~256 KB): crashes at depth=999 with recursive lookup().
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
@@ -153,25 +175,12 @@ class TransformValueTest {
             .maxDepth(Property.ofValue(1000))
             .build();
 
-        AtomicReference<Throwable> thrown = new AtomicReference<>();
-        Thread t = new Thread(null, () -> {
-            try {
-                task.run(runContext);
-            } catch (Throwable e) {
-                thrown.set(e);
-            }
-        }, "windows-stack-sim", 256 * 1024);
-        t.start();
-        t.join();
-
-        assertThat(thrown.get())
-            .as("StackOverflowError on 256 KB stack (Windows default) — requires iterative Frame.lookup()")
-            .isNull();
+        runOnSmallStack(task, runContext);
     }
 
     @Test
-    void shouldNotCrashWithDeepRecursionOnLinuxStack() throws InterruptedException {
-        // Linux JVM default thread stack ~512 KB; needs higher depth to overflow than Windows.
+    void shouldNotCrashWithDeepRecursionOnLinuxStack() throws Exception {
+        // Simulates a Linux worker explicitly launched with -Xss256k (e.g. constrained container).
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
@@ -181,19 +190,6 @@ class TransformValueTest {
             .maxDepth(Property.ofValue(2000))
             .build();
 
-        AtomicReference<Throwable> thrown = new AtomicReference<>();
-        Thread t = new Thread(null, () -> {
-            try {
-                task.run(runContext);
-            } catch (Throwable e) {
-                thrown.set(e);
-            }
-        }, "linux-stack-sim", 512 * 1024);
-        t.start();
-        t.join();
-
-        assertThat(thrown.get())
-            .as("StackOverflowError on 512 KB stack (Linux default) — requires iterative Frame.lookup()")
-            .isNull();
+        runOnSmallStack(task, runContext);
     }
 }
