@@ -1,5 +1,14 @@
 project.description = 'Kestra Plugin Transformation for Json.'
 
+// Run tests with a small thread stack to reproduce the Windows-default (~256 KB) crash scenario
+// described in https://github.com/dashjoin/jsonata-java/pull/107. afterEvaluate ensures this
+// appends after the root build's jvmArgs = [...] assignment in the Allure configuration block.
+afterEvaluate {
+    test {
+        jvmArgs '-Xss256k'
+    }
+}
+
 jar {
     manifest {
         attributes(
