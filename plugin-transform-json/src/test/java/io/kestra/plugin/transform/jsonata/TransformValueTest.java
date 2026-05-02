@@ -1,5 +1,6 @@
 package io.kestra.plugin.transform.jsonata;
 
+import com.dashjoin.jsonata.JException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.junit.annotations.KestraTest;
@@ -9,6 +10,8 @@ import io.kestra.core.runners.RunContextFactory;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -135,48 +138,61 @@ class TransformValueTest {
         assertThat(result.get(1).get(2).asText()).isEqualTo("8796977843745/8796995341857/8796999765537");
     }
 
-    // Regression tests for https://github.com/dashjoin/jsonata-java/pull/107
+    // Regression tests for StackOverflow protection in evaluateExpression().
     //
-    // Frame.lookup() was recursive — each JSONata recursive call adds a scope frame, and lookup()
-    // recurses once per frame when resolving a variable. With a high maxDepth, a deeply recursive
-    // expression overflows the JVM thread stack before maxDepth fires.
+    // Root cause: each JSONata recursion level pushes ~8 JVM frames. On 256 KB worker stacks
+    // (~300 usable frames), even maxDepth=200 allows 200 × 8 = 1600 frames — far past overflow.
+    //
+    // Fix (two layers):
+    //   1. Default maxDepth lowered to 50 (50 × 8 = 400 frames — safe on 256 KB stacks).
+    //      Bounds check fires and throws JException before any stack risk.
+    //   2. Evaluation runs on a dedicated thread with a 4 MB stack. If the user sets a high
+    //      maxDepth that allows overflow, the StackOverflowError is caught as Throwable inside
+    //      the throwaway eval thread. The worker thread reads the stored error and throws a
+    //      clean RuntimeException — the worker never crashes.
     //
     // Production crash: Windows worker default stack ~256 KB, crashed at depth=999.
-    // Test JVM is pinned to -Xss512k (see build.gradle) to reproduce on Linux CI.
-    // "+ 0" makes the expression non-tail-recursive, preventing jsonata-java TCO and forcing
-    // each frame to stay live on the JVM stack so the overflow actually happens.
-    //
-    // These tests currently FAIL (StackOverflowError thrown = bug present).
-    // They will PASS once dashjoin/jsonata-java#107 is merged and the dependency is bumped
-    // (iterative lookup = no stack growth = no overflow = permanent regression guard).
+    // Test JVM is pinned to -Xss512k (see build.gradle).
+    // "+ 0" makes the expression non-tail-recursive, preventing TCO, so frames stay live.
 
-    @Test
-    void shouldThrowStackOverflowWithDeepRecursionOnWindowsStack() throws Exception {
+    @ParameterizedTest
+    @ValueSource(ints = {50, 200, 500, 1000})
+    void shouldNeverThrowStackOverflowForCommonMaxDepthValues(int maxDepth) throws Exception {
+        // Each maxDepth value runs on a 4 MB eval thread. The bounds check fires at maxDepth
+        // (JException) well before the stack could overflow, regardless of worker stack size.
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
             .expression(Property.ofValue(
-                "($f := function($n) { $n > 0 ? $f($n - 1) + 0 : 0 }; $f(4999))"
+                "($f := function($n) { $n > 0 ? $f($n - 1) + 0 : 0 }; $f(10000))"
             ))
-            .maxDepth(Property.ofValue(5000))
+            .maxDepth(Property.ofValue(maxDepth))
             .build();
 
         assertThatThrownBy(() -> task.run(runContext))
-            .isInstanceOf(StackOverflowError.class);
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("Failed to evaluate expression")
+            .hasCauseInstanceOf(JException.class);
     }
 
     @Test
-    void shouldThrowStackOverflowWithDeepRecursionOnLinuxStack() throws Exception {
+    void shouldIsolateStackOverflowInEvalThreadWhenMaxDepthExceedsStackCapacity() throws Exception {
+        // User sets maxDepth high enough that bounds check never fires before stack exhaustion.
+        // On 4 MB eval thread (~40k safe levels), $f(49999) overflows the eval thread.
+        // StackOverflowError is caught as Throwable inside the eval thread; worker thread gets
+        // a clean RuntimeException instead of crashing.
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
             .expression(Property.ofValue(
-                "($f := function($n) { $n > 0 ? $f($n - 1) + 0 : 0 }; $f(4999))"
+                "($f := function($n) { $n > 0 ? $f($n - 1) + 0 : 0 }; $f(49999))"
             ))
-            .maxDepth(Property.ofValue(5000))
+            .maxDepth(Property.ofValue(50000))
             .build();
 
         assertThatThrownBy(() -> task.run(runContext))
-            .isInstanceOf(StackOverflowError.class);
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("Failed to evaluate expression")
+            .hasCauseInstanceOf(StackOverflowError.class);
     }
 }
