@@ -124,6 +124,38 @@ class TransformItemsTest {
     }
 
     @Test
+    void shouldReuseEvalThreadAcrossRecords() throws Exception {
+        // Verifies executor reuse: after run() completes, awaitTermination in shutdownEvalExecutor()
+        // guarantees the jsonata-eval thread is gone. If the old per-call new Thread() approach were
+        // used, 3 threads would be started and could still be alive briefly, making liveAfter > 0
+        // probabilistically — so this assertion is a reliable regression guard.
+        RunContext runContext = runContextFactory.of();
+        final Path outputFilePath = runContext.workingDir().createTempFile(".ion");
+        try (final Writer writer = new OutputStreamWriter(Files.newOutputStream(outputFilePath))) {
+            FileSerde.writeAll(writer, Flux.just(
+                Map.of("v", 1),
+                Map.of("v", 2),
+                Map.of("v", 3)
+            )).block();
+            writer.flush();
+        }
+        URI uri = runContext.storage().putFile(outputFilePath.toFile());
+
+        TransformItems task = TransformItems.builder()
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue("$"))
+            .build();
+
+        task.run(runContext);
+
+        long liveAfter = Thread.getAllStackTraces().keySet().stream()
+            .filter(t -> "jsonata-eval".equals(t.getName()))
+            .count();
+
+        Assertions.assertEquals(0, liveAfter, "jsonata-eval thread should be terminated after run()");
+    }
+
+    @Test
     void shouldTransformJsonInputWithDefaultIonMapper() throws Exception {
         // Given
         RunContext runContext = runContextFactory.of();

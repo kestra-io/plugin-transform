@@ -176,6 +176,37 @@ class TransformValueTest {
     }
 
     @Test
+    void shouldContinueWorkingAfterStackOverflowError() throws Exception {
+        // Validates that a StackOverflowError in one run does not poison the executor or the task.
+        // Each call to run() creates a fresh executor (via init + shutdownEvalExecutor in finally),
+        // so the second run always gets a clean state.
+        RunContext runContext = runContextFactory.of();
+
+        TransformValue taskWithHighDepth = TransformValue.builder()
+            .from(Property.ofValue("{}"))
+            .expression(Property.ofValue(
+                "($f := function($n) { $n > 0 ? $f($n - 1) + 0 : 0 }; $f(49999))"
+            ))
+            .maxDepth(Property.ofValue(50000))
+            .build();
+
+        assertThatThrownBy(() -> taskWithHighDepth.run(runContext))
+            .isInstanceOf(RuntimeException.class)
+            .hasCauseInstanceOf(StackOverflowError.class);
+
+        // Second run with a simple expression must succeed — no lingering poisoned state.
+        RunContext runContext2 = runContextFactory.of();
+        TransformValue simpleTask = TransformValue.builder()
+            .from(Property.ofValue("{\"x\": 42}"))
+            .expression(Property.ofValue("x"))
+            .build();
+
+        TransformValue.Output output = simpleTask.run(runContext2);
+        assertThat(output.getValue()).isNotNull();
+        assertThat(output.getValue().toString()).isEqualTo("42");
+    }
+
+    @Test
     void shouldIsolateStackOverflowInEvalThreadWhenMaxDepthExceedsStackCapacity() throws Exception {
         // User sets maxDepth high enough that bounds check never fires before stack exhaustion.
         // On 4 MB eval thread (~40k safe levels), $f(49999) overflows the eval thread.

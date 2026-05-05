@@ -20,6 +20,10 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import java.time.Duration;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.kestra.core.models.enums.MonacoLanguages;
@@ -49,6 +53,36 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
     @Getter(AccessLevel.PRIVATE)
     private Jsonata parsedExpression;
 
+    // Lazy-initialized; lifecycle managed by evalExecutor() / shutdownEvalExecutor().
+    // Assumption: Flux pipelines in subclasses are sequential (no parallel()/publishOn).
+    @Getter(AccessLevel.NONE)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private transient ExecutorService evalExecutor;
+
+    private ExecutorService evalExecutor() {
+        if (this.evalExecutor == null) {
+            this.evalExecutor = Executors.newSingleThreadExecutor(r -> {
+                var t = new Thread(null, r, "jsonata-eval", EVAL_THREAD_STACK_SIZE);
+                t.setDaemon(true);
+                return t;
+            });
+        }
+        return this.evalExecutor;
+    }
+
+    protected void shutdownEvalExecutor() {
+        if (this.evalExecutor != null) {
+            this.evalExecutor.shutdown();
+            try {
+                this.evalExecutor.awaitTermination(1, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            this.evalExecutor = null;
+        }
+    }
+
     public void init(RunContext runContext) throws Exception {
         var exprString = runContext.render(this.expression).as(String.class).orElseThrow();
         try {
@@ -72,22 +106,31 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
             var resultRef = new AtomicReference<JsonNode>();
             var errorRef = new AtomicReference<Throwable>();
 
-            // Eval runs on a dedicated thread with an explicit 4 MB stack. This serves two purposes:
+            // Eval runs on a dedicated executor thread (4 MB stack) that is reused across all records
+            // in the same task run. This serves two purposes:
             // 1. Normal case: worker stack size (e.g. 256 KB on Windows) cannot constrain the evaluator.
             // 2. Edge case (user sets very high maxDepth): if a StackOverflowError occurs in the eval
             //    thread, it is contained there. The worker thread reads the stored error and throws a
             //    clean RuntimeException — the worker never crashes.
-            var thread = new Thread(null, () -> {
+            // The catch is intentionally Throwable: this is a throwaway-thread sandbox, so every escape
+            // (including Errors like StackOverflowError and OutOfMemoryError) must land in errorRef.
+            // A narrower catch would let some Errors escape, leaving both refs null and producing a
+            // silent-null return after future.get().
+            var future = evalExecutor().submit(() -> {
                 try {
                     var result = this.parsedExpression.evaluate(data, frame);
                     resultRef.set(result != null ? MAPPER.valueToTree(result) : NullNode.getInstance());
                 } catch (Throwable t) {
                     errorRef.set(t);
                 }
-            }, "jsonata-eval", EVAL_THREAD_STACK_SIZE);
+                return null;
+            });
 
-            thread.start();
-            thread.join();
+            try {
+                future.get();
+            } catch (ExecutionException e) {
+                throw new RuntimeException("Failed to evaluate expression", e.getCause());
+            }
 
             if (errorRef.get() != null) {
                 throw new RuntimeException("Failed to evaluate expression", errorRef.get());
