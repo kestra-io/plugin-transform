@@ -20,5 +20,5 @@ jar {
 }
 
 dependencies {
-    implementation 'com.dashjoin:jsonata:0.9.9'
+    implementation 'com.dashjoin:jsonata:0.9.10'
 }
