@@ -80,7 +80,7 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
                 // awaitTermination only guarantees tasks finished — the thread itself may still
                 // be exiting. Join to ensure it's fully dead before returning.
                 if (this.evalThread != null) {
-                    this.evalThread.join(1_000);
+                    this.evalThread.join();
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
