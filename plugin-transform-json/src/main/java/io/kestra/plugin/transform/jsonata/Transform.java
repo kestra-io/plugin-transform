@@ -37,18 +37,14 @@ import io.kestra.core.models.annotations.PluginProperty;
 public abstract class Transform<T extends Output> extends Task implements JSONataInterface, RunnableTask<T> {
 
     private static final ObjectMapper MAPPER = JacksonMapper.ofJson();
-    // 4 MB: fits default maxDepth=50 × ~8 JVM frames/level with large headroom.
-    // Also isolates StackOverflowError inside the eval thread so the worker thread never crashes.
+    // 4 MB: isolates StackOverflowError inside the eval thread so the worker thread never crashes.
     private static final long EVAL_THREAD_STACK_SIZE = 4 * 1024 * 1024;
 
     @PluginProperty(language = MonacoLanguages.JAVASCRIPT, group = "advanced")
     private Property<String> expression;
 
-    // Default 50: each JSONata recursion level pushes ~8 JVM frames; 256 KB worker stacks
-    // (~300 usable frames) overflow before maxDepth fires at 200. 50 × 8 = 400 frames — safe.
-    // Users needing deeper recursion should increase both this value and the JVM stack size.
     @Builder.Default
-    private Property<Integer> maxDepth = Property.ofValue(50);
+    private Property<Integer> maxDepth = Property.ofValue(1000);
 
     @Getter(AccessLevel.PRIVATE)
     private Jsonata parsedExpression;
