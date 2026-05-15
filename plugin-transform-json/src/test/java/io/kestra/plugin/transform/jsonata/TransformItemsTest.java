@@ -19,6 +19,8 @@ import java.io.Writer;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -121,6 +123,104 @@ class TransformItemsTest {
 
         Assertions.assertEquals(1, transformationResult.size());
         Assertions.assertEquals(2, transformationResult.getFirst().size());
+    }
+
+    @Test
+    void shouldReuseEvalThreadAcrossRecords() throws Exception {
+        // Verifies executor reuse: after run() completes, awaitTermination in shutdownEvalExecutor()
+        // guarantees the jsonata-eval thread is gone. If the old per-call new Thread() approach were
+        // used, 3 threads would be started and could still be alive briefly, making liveAfter > 0
+        // probabilistically — so this assertion is a reliable regression guard.
+        RunContext runContext = runContextFactory.of();
+        final Path outputFilePath = runContext.workingDir().createTempFile(".ion");
+        try (final Writer writer = new OutputStreamWriter(Files.newOutputStream(outputFilePath))) {
+            FileSerde.writeAll(writer, Flux.just(
+                Map.of("v", 1),
+                Map.of("v", 2),
+                Map.of("v", 3)
+            )).block();
+            writer.flush();
+        }
+        URI uri = runContext.storage().putFile(outputFilePath.toFile());
+
+        TransformItems task = TransformItems.builder()
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue("$"))
+            .build();
+
+        task.run(runContext);
+
+        long liveAfter = Thread.getAllStackTraces().keySet().stream()
+            .filter(t -> "jsonata-eval".equals(t.getName()))
+            .count();
+
+        Assertions.assertEquals(0, liveAfter, "jsonata-eval thread should be terminated after run()");
+    }
+
+    @Test
+    void shouldHandleLargeDatasetWithFlatFieldLookupOnConstrainedStack() throws Exception {
+        // Regression: TransformItems crashed the Windows worker with StackOverflowError when processing
+        // a large LDAP-like dataset. The crash was in Jsonata$Frame.lookup() scope-chain recursion —
+        // unrelated to user-defined function depth, so lowering maxDepth had no effect.
+        // The fix is the 4 MB eval thread. This test JVM runs at -Xss512k (build.gradle) to simulate
+        // the constrained Windows stack.
+        RunContext runContext = runContextFactory.of();
+        final Path outputFilePath = runContext.workingDir().createTempFile(".ion");
+
+        int recordCount = 5_000;
+        List<Map<String, Object>> records = new ArrayList<>(recordCount);
+        for (int i = 0; i < recordCount; i++) {
+            Map<String, Object> attributes = new HashMap<>();
+            attributes.put("mail", List.of("user" + i + "@example.com"));
+            attributes.put("cn", List.of("User " + i));
+            attributes.put("displayName", List.of("Display User " + i));
+            attributes.put("givenName", List.of("First" + i));
+            attributes.put("sn", List.of("Last" + i));
+            attributes.put("uid", List.of("uid" + i));
+            attributes.put("employeenumber", List.of("EMP" + i));
+            attributes.put("tCID", List.of("CID" + i));
+            attributes.put("tWrID", List.of("WR" + i));
+            attributes.put("tMainWrID", List.of("MWR" + i));
+            attributes.put("tisActive", List.of("TRUE"));
+            attributes.put("tStatusOfEmployment", List.of("active"));
+            attributes.put("preferredLanguage", List.of("en"));
+            // Multi-value field — mirrors the isMemberOf array the customer used $join() on
+            attributes.put("isMemberOf", List.of("cn=group1,ou=groups", "cn=group2,ou=groups", "cn=group3,ou=groups"));
+            records.add(Map.of("dn", "uid=user" + i + ",ou=Account,o=DTAG", "attributes", attributes));
+        }
+
+        try (Writer writer = new OutputStreamWriter(Files.newOutputStream(outputFilePath))) {
+            FileSerde.writeAll(writer, Flux.fromIterable(records)).block();
+            writer.flush();
+        }
+        URI uri = runContext.storage().putFile(outputFilePath.toFile());
+
+        TransformItems task = TransformItems.builder()
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue("""
+                {
+                  "DN": dn ? $string(dn) : null,
+                  "MAIL": attributes.mail[0] ? $string(attributes.mail[0]) : null,
+                  "CN": attributes.cn[0] ? $string(attributes.cn[0]) : null,
+                  "DISPLAY_NAME": attributes.displayName[0] ? $string(attributes.displayName[0]) : null,
+                  "GIVEN_NAME": attributes.givenName[0] ? $string(attributes.givenName[0]) : null,
+                  "SN": attributes.sn[0] ? $string(attributes.sn[0]) : null,
+                  "UID": attributes.uid[0] ? $string(attributes.uid[0]) : null,
+                  "EMPLOYEENUMBER": attributes.employeenumber[0] ? $string(attributes.employeenumber[0]) : null,
+                  "TCID": attributes.tCID[0] ? $string(attributes.tCID[0]) : null,
+                  "TWRID": attributes.tWrID[$ != attributes.tMainWrID[0]][0] ? $string(attributes.tWrID[$ != attributes.tMainWrID[0]][0]) : (attributes.tWrID[0] ? $string(attributes.tWrID[0]) : null),
+                  "TMAINWRID": attributes.tMainWrID[0] ? $string(attributes.tMainWrID[0]) : null,
+                  "TIS_ACTIVE": attributes.tisActive[0] ? $string(attributes.tisActive[0]) : null,
+                  "TSTATUS_OF_EMPLOYMENT": attributes.tStatusOfEmployment[0] ? $string(attributes.tStatusOfEmployment[0]) : null,
+                  "PREFERREDLANGUAGE": attributes.preferredLanguage[0] ? $string(attributes.preferredLanguage[0]) : null,
+                  "ISMEMBEROF": attributes.isMemberOf ? $join(attributes.isMemberOf, "|") : null
+                }
+                """))
+            .build();
+
+        TransformItems.Output output = task.run(runContext);
+
+        Assertions.assertEquals(recordCount, output.getProcessedItemsTotal());
     }
 
     @Test

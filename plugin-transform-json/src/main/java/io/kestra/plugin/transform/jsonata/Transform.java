@@ -20,6 +20,11 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import java.time.Duration;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import io.kestra.core.models.enums.MonacoLanguages;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -32,15 +37,58 @@ import io.kestra.core.models.annotations.PluginProperty;
 public abstract class Transform<T extends Output> extends Task implements JSONataInterface, RunnableTask<T> {
 
     private static final ObjectMapper MAPPER = JacksonMapper.ofJson();
+    // 4 MB: isolates StackOverflowError inside the eval thread so the worker thread never crashes.
+    private static final long EVAL_THREAD_STACK_SIZE = 4 * 1024 * 1024;
 
     @PluginProperty(language = MonacoLanguages.JAVASCRIPT, group = "advanced")
     private Property<String> expression;
 
     @Builder.Default
-    private Property<Integer> maxDepth = Property.ofValue(200);
+    private Property<Integer> maxDepth = Property.ofValue(1000);
 
     @Getter(AccessLevel.PRIVATE)
     private Jsonata parsedExpression;
+
+    // Lazy-initialized; lifecycle managed by evalExecutor() / shutdownEvalExecutor().
+    // Assumption: Flux pipelines in subclasses are sequential (no parallel()/publishOn).
+    @Getter(AccessLevel.NONE)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private transient ExecutorService evalExecutor;
+
+    @Getter(AccessLevel.NONE)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private transient Thread evalThread;
+
+    private ExecutorService evalExecutor() {
+        if (this.evalExecutor == null) {
+            this.evalExecutor = Executors.newSingleThreadExecutor(r -> {
+                evalThread = new Thread(null, r, "jsonata-eval", EVAL_THREAD_STACK_SIZE);
+                evalThread.setDaemon(true);
+                return evalThread;
+            });
+        }
+        return this.evalExecutor;
+    }
+
+    protected void shutdownEvalExecutor() {
+        if (this.evalExecutor != null) {
+            this.evalExecutor.shutdown();
+            try {
+                this.evalExecutor.awaitTermination(1, TimeUnit.SECONDS);
+                // awaitTermination only guarantees tasks finished — the thread itself may still
+                // be exiting. Join to ensure it's fully dead before returning.
+                if (this.evalThread != null) {
+                    this.evalThread.join();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            this.evalExecutor = null;
+            this.evalThread = null;
+        }
+    }
 
     public void init(RunContext runContext) throws Exception {
         var exprString = runContext.render(this.expression).as(String.class).orElseThrow();
@@ -62,12 +110,43 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
             var frame = this.parsedExpression.createFrame();
             frame.setRuntimeBounds(timeoutInMilli, rMaxDepth);
 
-            var result = this.parsedExpression.evaluate(data, frame);
-            if (result == null) {
-                return NullNode.getInstance();
+            var resultRef = new AtomicReference<JsonNode>();
+            var errorRef = new AtomicReference<Throwable>();
+
+            // Eval runs on a dedicated executor thread (4 MB stack) that is reused across all records
+            // in the same task run. This serves two purposes:
+            // 1. Normal case: worker stack size (e.g. 256 KB on Windows) cannot constrain the evaluator.
+            // 2. Edge case (user sets very high maxDepth): if a StackOverflowError occurs in the eval
+            //    thread, it is contained there. The worker thread reads the stored error and throws a
+            //    clean RuntimeException — the worker never crashes.
+            // The catch is intentionally Throwable: this is a throwaway-thread sandbox, so every escape
+            // (including Errors like StackOverflowError and OutOfMemoryError) must land in errorRef.
+            // A narrower catch would let some Errors escape, leaving both refs null and producing a
+            // silent-null return after future.get().
+            var future = evalExecutor().submit(() -> {
+                try {
+                    var result = this.parsedExpression.evaluate(data, frame);
+                    resultRef.set(result != null ? MAPPER.valueToTree(result) : NullNode.getInstance());
+                } catch (Throwable t) {
+                    errorRef.set(t);
+                }
+                return null;
+            });
+
+            try {
+                future.get();
+            } catch (ExecutionException e) {
+                throw new RuntimeException("Failed to evaluate expression", e.getCause());
             }
-            return MAPPER.valueToTree(result);
-        } catch (JException | IllegalVariableEvaluationException e) {
+
+            if (errorRef.get() != null) {
+                throw new RuntimeException("Failed to evaluate expression", errorRef.get());
+            }
+            return resultRef.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("JSONata evaluation interrupted", e);
+        } catch (IllegalVariableEvaluationException e) {
             throw new RuntimeException("Failed to evaluate expression", e);
         }
     }
