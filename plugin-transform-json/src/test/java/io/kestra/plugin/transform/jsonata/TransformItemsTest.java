@@ -159,11 +159,11 @@ class TransformItemsTest {
 
     @Test
     void shouldHandleLargeDatasetWithFlatFieldLookupOnConstrainedStack() throws Exception {
-        // Regression test for Pylon #1703 (T-Systems): TransformItems crashed the Windows worker with
-        // StackOverflowError when processing a large LDAP dataset (~200k records, ~30 attributes each).
-        // The crash was in Jsonata$Frame.lookup() scope-chain recursion — unrelated to user-defined
-        // function depth, so lowering maxDepth had no effect. The fix is the 4 MB eval thread.
-        // This test JVM runs at -Xss512k (build.gradle) to simulate the constrained Windows stack.
+        // Regression: TransformItems crashed the Windows worker with StackOverflowError when processing
+        // a large LDAP-like dataset. The crash was in Jsonata$Frame.lookup() scope-chain recursion —
+        // unrelated to user-defined function depth, so lowering maxDepth had no effect.
+        // The fix is the 4 MB eval thread. This test JVM runs at -Xss512k (build.gradle) to simulate
+        // the constrained Windows stack.
         RunContext runContext = runContextFactory.of();
         final Path outputFilePath = runContext.workingDir().createTempFile(".ion");
 

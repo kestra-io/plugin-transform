@@ -56,12 +56,17 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
     @EqualsAndHashCode.Exclude
     private transient ExecutorService evalExecutor;
 
+    @Getter(AccessLevel.NONE)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private transient Thread evalThread;
+
     private ExecutorService evalExecutor() {
         if (this.evalExecutor == null) {
             this.evalExecutor = Executors.newSingleThreadExecutor(r -> {
-                var t = new Thread(null, r, "jsonata-eval", EVAL_THREAD_STACK_SIZE);
-                t.setDaemon(true);
-                return t;
+                evalThread = new Thread(null, r, "jsonata-eval", EVAL_THREAD_STACK_SIZE);
+                evalThread.setDaemon(true);
+                return evalThread;
             });
         }
         return this.evalExecutor;
@@ -72,10 +77,16 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
             this.evalExecutor.shutdown();
             try {
                 this.evalExecutor.awaitTermination(1, TimeUnit.SECONDS);
+                // awaitTermination only guarantees tasks finished — the thread itself may still
+                // be exiting. Join to ensure it's fully dead before returning.
+                if (this.evalThread != null) {
+                    this.evalThread.join(1_000);
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
             this.evalExecutor = null;
+            this.evalThread = null;
         }
     }
 
