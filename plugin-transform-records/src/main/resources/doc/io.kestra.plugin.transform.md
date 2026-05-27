@@ -1,3 +1,5 @@
+# How to use the Transform plugin
+
 These tasks let you reshape, filter, combine, flatten, and summarize structured data without writing custom code. They work both with in-memory records and with stored Ion files, so the same tasks can be used for small workflow variables and larger streamed datasets.
 
 ## Common Inputs And Outputs
