@@ -28,7 +28,7 @@ import java.util.stream.StreamSupport;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Transform or query a JSON or ION file using JSONata.",
+    title = "Transform or query a JSON or ION file using JSONata",
     description = "[JSONata](https://jsonata.org/) is a query and transformation language for JSON data."
 )
 @Plugin(
@@ -165,12 +165,12 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "File URI containing the result of transformation."
+            title = "File URI containing the result of transformation"
         )
         private final URI uri;
 
         @Schema(
-            title = "The total number of items that was processed by the task."
+            title = "The total number of items that was processed by the task"
         )
         private final Long processedItemsTotal;
     }

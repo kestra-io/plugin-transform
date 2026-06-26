@@ -29,7 +29,7 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Parse and structure items from a JSON internal storage file using Grok expressions.",
+    title = "Parse and structure items from a JSON internal storage file using Grok expressions",
     description = """
         The `TransformItems` task is similar to the famous Logstash Grok filter from the ELK stack.
         It is particularly useful for transforming unstructured data such as logs into a structured, indexable, and queryable data structure.
@@ -72,7 +72,7 @@ import java.util.Map;
 public class TransformItems extends Transform implements GrokInterface, RunnableTask<Output> {
 
     @Schema(
-        title = "The file to be transformed.",
+        title = "The file to be transformed",
         description = "Must be a `kestra://` internal storage URI."
     )
     @NotNull
@@ -123,12 +123,12 @@ public class TransformItems extends Transform implements GrokInterface, Runnable
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The transformed file URI."
+            title = "The transformed file URI"
         )
         private final URI uri;
 
         @Schema(
-            title = "The total number of items that was processed by the task."
+            title = "The total number of items that was processed by the task"
         )
         private final Long processedItemsTotal;
     }
