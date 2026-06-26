@@ -27,7 +27,7 @@ import io.kestra.core.models.annotations.PluginProperty;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Parse and structure raw JSON string using Grok expressions.",
+    title = "Parse and structure raw JSON string using Grok expressions",
     description = """
         The `TransformValue` task is similar to the famous Logstash Grok filter from the ELK stack.
         It is particularly useful for transforming unstructured data such as logs into a structured, indexable, and queryable data structure.
@@ -75,7 +75,7 @@ import io.kestra.core.models.annotations.PluginProperty;
 )
 public class TransformValue extends Transform implements GrokInterface, RunnableTask<Output> {
 
-    @Schema(title = "The value to parse.")
+    @Schema(title = "The value to parse")
     @NotNull
     @PluginProperty(group = "main")
     private Property<String> from;
@@ -101,7 +101,7 @@ public class TransformValue extends Transform implements GrokInterface, Runnable
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The transformed value."
+            title = "The transformed value"
         )
         private final Map<String, Object> value;
     }
