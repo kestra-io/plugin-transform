@@ -13,5 +13,5 @@ jar {
 }
 
 dependencies {
-    implementation "com.amazon.ion:ion-java:1.11.11"
+    implementation "com.amazon.ion:ion-java:1.12.0"
 }
