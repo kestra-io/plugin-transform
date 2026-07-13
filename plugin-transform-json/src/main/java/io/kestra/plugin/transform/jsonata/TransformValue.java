@@ -25,7 +25,7 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Transform or query a JSON string using JSONata.",
+    title = "Transform or query a JSON string using JSONata",
     description = "[JSONata](https://jsonata.org/) is a query and transformation language for JSON data."
 )
 @Plugin(
@@ -86,7 +86,7 @@ public class TransformValue extends Transform<TransformValue.Output> implements 
     public static final ObjectMapper JSON_OBJECT_MAPPER = JacksonMapper.ofJson();
 
     @Schema(
-        title = "The value to be transformed.",
+        title = "The value to be transformed",
         description = "Must be a valid JSON string."
     )
     @NotNull
@@ -101,13 +101,17 @@ public class TransformValue extends Transform<TransformValue.Output> implements 
     public Output run(RunContext runContext) throws Exception {
         init(runContext);
 
-        final JsonNode from = parseJson(runContext.render(this.from).as(String.class).orElseThrow());
+        try {
+            final JsonNode from = parseJson(runContext.render(this.from).as(String.class).orElseThrow());
 
-        // transform
-        JsonNode transformed = evaluateExpression(runContext, from);
+            // transform
+            JsonNode transformed = evaluateExpression(runContext, from);
 
-        // output
-        return Output.builder().value(transformed).build();
+            // output
+            return Output.builder().value(transformed).build();
+        } finally {
+            shutdownEvalExecutor();
+        }
     }
 
     private static JsonNode parseJson(String from) {
@@ -122,7 +126,7 @@ public class TransformValue extends Transform<TransformValue.Output> implements 
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The transformed value."
+            title = "The transformed value"
         )
         private final Object value;
     }

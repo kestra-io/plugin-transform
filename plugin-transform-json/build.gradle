@@ -1,5 +1,12 @@
 project.description = 'Kestra Plugin Transformation for Json.'
 
+// -Xss512k matches the constrained stack that triggered the production crash (Windows default is
+// ~320 KB; 512k is slightly above the HotSpot minimum and safely above the Kestra framework needs).
+// Without this, the Linux default thread stack (~8 MB) is far too large to reproduce the overflow.
+test {
+    jvmArgs '-Xss512k'
+}
+
 jar {
     manifest {
         attributes(
@@ -13,5 +20,5 @@ jar {
 }
 
 dependencies {
-    implementation 'com.dashjoin:jsonata:0.9.9'
+    implementation 'com.dashjoin:jsonata:0.9.10'
 }

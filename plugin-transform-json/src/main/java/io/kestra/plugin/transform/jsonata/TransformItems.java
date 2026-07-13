@@ -28,7 +28,7 @@ import java.util.stream.StreamSupport;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Transform or query a JSON or ION file using JSONata.",
+    title = "Transform or query a JSON or ION file using JSONata",
     description = "[JSONata](https://jsonata.org/) is a query and transformation language for JSON data."
 )
 @Plugin(
@@ -120,40 +120,44 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
 
         init(runContext);
 
-        final URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
+        try {
+            final URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
-        try (Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE)) {
-            Flux<JsonNode> flux = FileSerde.readAll(reader, new TypeReference<>() {
-            });
-            final Path outputFilePath = runContext.workingDir().createTempFile(".ion");
-            try (Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(outputFilePath)))) {
+            try (Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE)) {
+                Flux<JsonNode> flux = FileSerde.readAll(reader, new TypeReference<>() {
+                });
+                final Path outputFilePath = runContext.workingDir().createTempFile(".ion");
+                try (Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(outputFilePath)))) {
 
-                // transform
-                Flux<JsonNode> values = flux.map(node -> this.evaluateExpression(runContext, node));
+                    // transform
+                    Flux<JsonNode> values = flux.map(node -> this.evaluateExpression(runContext, node));
 
-                if (runContext.render(explodeArray).as(Boolean.class).orElseThrow()) {
-                    values = values.flatMap(jsonNode -> {
-                        if (jsonNode.isArray()) {
-                            Iterable<JsonNode> iterable = jsonNode::elements;
-                            return Flux.fromStream(StreamSupport.stream(iterable.spliterator(), false));
-                        }
-                        return Mono.just(jsonNode);
-                    });
+                    if (runContext.render(explodeArray).as(Boolean.class).orElseThrow()) {
+                        values = values.flatMap(jsonNode -> {
+                            if (jsonNode.isArray()) {
+                                Iterable<JsonNode> iterable = jsonNode::elements;
+                                return Flux.fromStream(StreamSupport.stream(iterable.spliterator(), false));
+                            }
+                            return Mono.just(jsonNode);
+                        });
+                    }
+
+                    Long processedItemsTotal = FileSerde.writeAll(writer, values).block();
+
+                    URI uri = runContext.storage().putFile(outputFilePath.toFile());
+
+                    // output
+                    return Output
+                        .builder()
+                        .uri(uri)
+                        .processedItemsTotal(processedItemsTotal)
+                        .build();
+                } finally {
+                    Files.deleteIfExists(outputFilePath); // ensure temp file is deleted in case of error
                 }
-
-                Long processedItemsTotal = FileSerde.writeAll(writer, values).block();
-
-                URI uri = runContext.storage().putFile(outputFilePath.toFile());
-
-                // output
-                return Output
-                    .builder()
-                    .uri(uri)
-                    .processedItemsTotal(processedItemsTotal)
-                    .build();
-            } finally {
-                Files.deleteIfExists(outputFilePath); // ensure temp file is deleted in case of error
             }
+        } finally {
+            shutdownEvalExecutor();
         }
     }
 
@@ -161,12 +165,12 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "File URI containing the result of transformation."
+            title = "File URI containing the result of transformation"
         )
         private final URI uri;
 
         @Schema(
-            title = "The total number of items that was processed by the task."
+            title = "The total number of items that was processed by the task"
         )
         private final Long processedItemsTotal;
     }
