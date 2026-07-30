@@ -108,7 +108,7 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
 
             var data = MAPPER.convertValue(jsonNode, Object.class);
             var frame = this.parsedExpression.createFrame();
-            frame.setRuntimeBounds(timeoutInMilli, rMaxDepth);
+            EvaluationBounds.register(frame, rMaxDepth, timeoutInMilli);
 
             var resultRef = new AtomicReference<JsonNode>();
             var errorRef = new AtomicReference<Throwable>();

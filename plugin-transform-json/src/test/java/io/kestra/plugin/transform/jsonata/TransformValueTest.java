@@ -13,6 +13,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.time.Duration;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -204,6 +208,84 @@ class TransformValueTest {
         TransformValue.Output output = simpleTask.run(runContext2);
         assertThat(output.getValue()).isNotNull();
         assertThat(output.getValue().toString()).isEqualTo("42");
+    }
+
+    // Regression: kestra-io/plugin-transform#102.
+    // Frame.setRuntimeBounds counted one un-unwound level per input item, so maxDepth silently bounded
+    // input size — a 1000-item batch failed on the default maxDepth=1000 with a message blaming
+    // recursion the expression never contained. EvaluationBounds counts entry/exit symmetrically, so the
+    // budget a given expression needs is a property of the expression alone.
+
+    @ParameterizedTest
+    @ValueSource(ints = {10, 400})
+    void shouldRequireTheSameMaxDepthRegardlessOfInputSize(int itemCount) throws Exception {
+        // maxDepth=12 leaves ample headroom over the 4 levels this expression actually nests, while staying
+        // far below the itemCount + 3 the leaking counter reached — so it fails pre-fix at both sizes and
+        // passes post-fix at both. 400 is the upper size because $map with a lambda is still quadratic
+        // upstream (defect 2 of #102); the size-independence claim is carried to 5000 items by
+        // TransformItemsTest#shouldCollapseBatchIntoOneRecordOnDefaultMaxDepth, which uses the linear form.
+        RunContext runContext = runContextFactory.of();
+        TransformValue task = TransformValue.builder()
+            .from(Property.ofValue(jsonArrayOfItems(itemCount)))
+            .expression(Property.ofValue("""
+                {
+                  "items": $append([], $map($, function($r) {
+                    {
+                      "eventId": $r.eventId,
+                      "deposit": [ { "value": $r.value, "currency": $r.currency } ]
+                    }
+                  }))
+                }
+                """))
+            .maxDepth(Property.ofValue(12))
+            .build();
+
+        TransformValue.Output output = task.run(runContext);
+
+        assertThat(output.getValue()).isNotNull();
+        JsonNode result = new ObjectMapper().valueToTree(output.getValue());
+        assertThat(result.get("items").size()).isEqualTo(itemCount);
+    }
+
+    @Test
+    void shouldReportMaxDepthBreachWithActionableMessage() throws Exception {
+        RunContext runContext = runContextFactory.of();
+        TransformValue task = TransformValue.builder()
+            .from(Property.ofValue("{}"))
+            .expression(Property.ofValue("($f := function($n) { $n > 0 ? $f($n - 1) + 0 : 0 }; $f(500))"))
+            .maxDepth(Property.ofValue(100))
+            .build();
+
+        assertThatThrownBy(() -> task.run(runContext))
+            .isInstanceOf(RuntimeException.class)
+            .hasCauseInstanceOf(JException.class)
+            .cause()
+            .hasMessageContaining("exceeded maxDepth=100");
+    }
+
+    @Test
+    void shouldStillEnforceTimeout() throws Exception {
+        // Guards that replacing setRuntimeBounds did not drop timeout enforcement along with the depth
+        // counter. The expression is tail-recursive, so TCO holds it at ~5 nested levels: it runs long
+        // purely through iteration count and cannot be stopped by the depth bound instead.
+        RunContext runContext = runContextFactory.of();
+        TransformValue task = TransformValue.builder()
+            .from(Property.ofValue("{}"))
+            .expression(Property.ofValue("($f := function($n) { $n > 0 ? $f($n - 1) : 0 }; $f(5000000))"))
+            .timeout(Property.ofValue(Duration.ofMillis(200)))
+            .build();
+
+        assertThatThrownBy(() -> task.run(runContext))
+            .isInstanceOf(RuntimeException.class)
+            .hasCauseInstanceOf(JException.class)
+            .cause()
+            .hasMessageContaining("exceeded timeout=200ms");
+    }
+
+    private static String jsonArrayOfItems(int itemCount) {
+        return IntStream.range(0, itemCount)
+            .mapToObj(i -> "{\"eventId\":\"e%d\",\"value\":%d,\"currency\":\"USD\"}".formatted(i, i))
+            .collect(Collectors.joining(",", "[", "]"));
     }
 
     @Test
