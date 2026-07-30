@@ -18,14 +18,14 @@ Expressions follow the standard JSONata syntax. See the [JSONata documentation](
 
 ### Prefer path projection over `$map` with a lambda
 
-Mapping a batch with a user-defined function is quadratic in the underlying engine, so it degrades sharply with batch size — around 39 s for 1000 items where the equivalent path projection takes 10 ms. Both forms produce the same output, so prefer the projection:
+Building an object around a batch mapped through a user-defined function is quadratic in the underlying engine, so it degrades sharply with batch size — around 18 s for 1000 items where the equivalent path projection takes 18 ms. Both forms produce the same output, so prefer the projection:
 
 ```
 # slow — avoid
-$append([], $map($, function($r) { { "id": $r.eventId, "amount": $r.value } }))
+{ "items": $map($, function($r) { { "id": $r.eventId, "amount": $r.value } }) }
 
 # fast — same result
-[ $.{ "id": eventId, "amount": value } ]
+{ "items": [ $.{ "id": eventId, "amount": value } ] }
 ```
 
-The cost is in [`dashjoin/jsonata-java`](https://github.com/dashjoin/jsonata-java), not in this plugin. Reach for `$map` with a lambda only when the transformation genuinely needs a function value, such as passing it to `$reduce` or `$sort`.
+It takes both ingredients to trigger: the same object wrapper around a builtin function (`$map($, $string)`) stays fast, and so does the lambda on its own without the wrapper. The cost is in [`dashjoin/jsonata-java`](https://github.com/dashjoin/jsonata-java), not in this plugin. Reach for `$map` with a lambda only when the transformation genuinely needs a function value, such as passing it to `$reduce` or `$sort`.
