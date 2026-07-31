@@ -10,6 +10,8 @@ import io.kestra.core.serializers.FileSerde;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
@@ -221,6 +223,52 @@ class TransformItemsTest {
         TransformItems.Output output = task.run(runContext);
 
         Assertions.assertEquals(recordCount, output.getProcessedItemsTotal());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {100, 5_000})
+    void shouldCollapseBatchIntoOneRecordOnDefaultMaxDepth(int itemCount) throws Exception {
+        // Regression: kestra-io/plugin-transform#102. One record holding a batch of N items, folded into a
+        // single object — the reported shape. Frame.setRuntimeBounds leaked depth per item, so the default
+        // maxDepth=1000 failed above roughly 300 items here with "Depth=1001 max=1000" while passing at 100.
+        // The nested object constructor is what leaked; the projection form keeps the test linear in time.
+        RunContext runContext = runContextFactory.of();
+        final Path outputFilePath = runContext.workingDir().createTempFile(".ion");
+
+        List<Map<String, Object>> batch = new ArrayList<>(itemCount);
+        for (int i = 0; i < itemCount; i++) {
+            batch.add(Map.of("eventId", "e" + i, "value", i, "currency", "USD"));
+        }
+
+        try (Writer writer = new OutputStreamWriter(Files.newOutputStream(outputFilePath))) {
+            FileSerde.writeAll(writer, Flux.just(batch)).block();
+            writer.flush();
+        }
+        URI uri = runContext.storage().putFile(outputFilePath.toFile());
+
+        TransformItems task = TransformItems.builder()
+            .from(Property.ofValue(uri.toString()))
+            .explodeArray(Property.ofValue(false))
+            .expression(Property.ofValue("""
+                {
+                  "items": [ $.{
+                    "eventId": eventId,
+                    "deposit": [ { "value": value, "currency": currency } ]
+                  } ]
+                }
+                """))
+            .build();
+
+        TransformItems.Output output = task.run(runContext);
+
+        Assertions.assertEquals(1, output.getProcessedItemsTotal());
+
+        InputStream is = runContext.storage().getFile(output.getUri());
+        List<Map> transformationResult = FileSerde.readAll(new InputStreamReader(is), new TypeReference<Map>() {
+        }).collectList().block();
+
+        Assertions.assertEquals(1, transformationResult.size());
+        Assertions.assertEquals(itemCount, ((List<?>) transformationResult.getFirst().get("items")).size());
     }
 
     @Test
