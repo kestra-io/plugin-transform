@@ -6,7 +6,7 @@ import com.dashjoin.jsonata.Jsonata;
 /**
  * Depth and timeout guard for a single JSONata evaluation.
  *
- * <p>Replaces {@link Jsonata.Frame#setRuntimeBounds(long, int)}, whose {@code Timebox} skips the
+ * <p>Replaces {@code Jsonata.Frame#setRuntimeBounds(long, int)}, whose {@code Timebox} skips the
  * increment and the decrement whenever the frame carries {@code isParallelCall}. Entry and exit do
  * not observe the same flag for a given {@code evaluate()} call, so the counter gains one per input
  * item and never unwinds — making {@code maxDepth} bound input size instead of recursion depth
@@ -34,6 +34,11 @@ final class EvaluationBounds {
     }
 
     private void enter() {
+        checkDepth();
+        checkTimeout();
+    }
+
+    private void checkDepth() {
         if (++depth > maxDepth) {
             throw new JException(
                 "JSONata expression exceeded maxDepth=" + maxDepth + " nested evaluation levels. "
@@ -42,7 +47,14 @@ final class EvaluationBounds {
                 -1
             );
         }
+    }
 
+    /**
+     * Checked on entry only, unlike {@code Timebox.checkRunnaway()} which also checked on exit. Every
+     * node that can extend the evaluation enters before it runs, so the entry check bounds the overrun
+     * to a single node; neither side can interrupt an in-flight call anyway.
+     */
+    private void checkTimeout() {
         if (System.currentTimeMillis() - startedAt > timeoutMillis) {
             throw new JException(
                 "JSONata evaluation exceeded timeout=" + timeoutMillis + "ms. "

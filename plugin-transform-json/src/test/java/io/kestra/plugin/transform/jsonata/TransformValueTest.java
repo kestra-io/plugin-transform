@@ -268,6 +268,9 @@ class TransformValueTest {
         // Guards that replacing setRuntimeBounds did not drop timeout enforcement along with the depth
         // counter. The expression is tail-recursive, so TCO holds it at ~5 nested levels: it runs long
         // purely through iteration count and cannot be stopped by the depth bound instead.
+        // Wall-clock assertion by nature: 5M interpreted iterations against a 200ms budget leaves a wide
+        // margin. Widen it further (more iterations, lower timeout) if CI contention ever makes it flake —
+        // this is the only guard that timeout enforcement survived the move off Timebox.
         RunContext runContext = runContextFactory.of();
         TransformValue task = TransformValue.builder()
             .from(Property.ofValue("{}"))
