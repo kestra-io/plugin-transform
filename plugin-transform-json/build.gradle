@@ -12,7 +12,7 @@ jar {
         attributes(
                 "X-Kestra-Name": project.name,
                 "X-Kestra-Title": "JSONata",
-                "X-Kestra-Group": project.group + ".json",
+                "X-Kestra-Group": project.group + ".transform.jsonata",
                 "X-Kestra-Description": project.description,
                 "X-Kestra-Version": project.version
         )
