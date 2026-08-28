@@ -1,6 +1,6 @@
 package io.kestra.plugin.transform.grok;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -10,6 +10,7 @@ import io.kestra.core.models.tasks.Output;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import io.kestra.core.serializers.JacksonMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -71,6 +72,8 @@ import java.util.Map;
 )
 public class TransformItems extends Transform implements GrokInterface, RunnableTask<Output> {
 
+    private static final ObjectMapper ION_MAPPER = JacksonMapper.ofIon();
+
     @Schema(
         title = "The file to be transformed",
         description = "Must be a `kestra://` internal storage URI."
@@ -89,11 +92,13 @@ public class TransformItems extends Transform implements GrokInterface, Runnable
         String from = runContext.render(this.from).as(String.class).orElseThrow();
 
         URI objectURI = new URI(from);
-        try (Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(objectURI)), FileSerde.BUFFER_SIZE)) {
-            Flux<String> flux = FileSerde.readAll(reader, new TypeReference<>() {
-            });
+        try (BufferedReader reader = new BufferedReader(
+            new InputStreamReader(runContext.storage().getFile(objectURI), StandardCharsets.UTF_8),
+            FileSerde.BUFFER_SIZE
+        )) {
+            Flux<String> flux = Flux.fromStream(reader.lines()).map(TransformItems::decodeItem);
             final Path ouputFilePath = runContext.workingDir().createTempFile(".ion");
-            try (Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(ouputFilePath)))) {
+            try (Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(ouputFilePath), StandardCharsets.UTF_8))) {
 
                 // transform
                 Flux<Map<String, Object>> values = flux.map(data -> {
@@ -117,6 +122,24 @@ public class TransformItems extends Transform implements GrokInterface, Runnable
                 Files.deleteIfExists(ouputFilePath); // ensure temp file is deleted in case of error
             }
         }
+    }
+
+    /**
+     * Decodes an Ion/JSON quoted string for backward compatibility; otherwise returns the raw line.
+     */
+    static String decodeItem(String line) {
+        int i = 0;
+        while (i < line.length() && Character.isWhitespace(line.charAt(i))) {
+            i++;
+        }
+        if (i < line.length() && line.charAt(i) == '"') {
+            try {
+                return ION_MAPPER.readValue(line.substring(i), String.class);
+            } catch (IOException ignored) {
+                // not a valid Ion/JSON string — treat as plain text
+            }
+        }
+        return line;
     }
 
     @Builder
