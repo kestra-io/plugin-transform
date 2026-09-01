@@ -6,7 +6,6 @@ import com.dashjoin.jsonata.JException;
 import com.dashjoin.jsonata.Jsonata;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.NullNode;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Output;
@@ -99,6 +98,12 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
         }
     }
 
+    /**
+     * Evaluates the expression against the given node.
+     *
+     * @return the transformed node, or {@code null} when the expression yields JSONata's
+     * <em>undefined</em> — it matched nothing.
+     */
     protected JsonNode evaluateExpression(RunContext runContext, JsonNode jsonNode) {
         try {
             var timeoutInMilli = runContext.render(getTimeout()).as(Duration.class)
@@ -122,11 +127,12 @@ public abstract class Transform<T extends Output> extends Task implements JSONat
             // The catch is intentionally Throwable: this is a throwaway-thread sandbox, so every escape
             // (including Errors like StackOverflowError and OutOfMemoryError) must land in errorRef.
             // A narrower catch would let some Errors escape, leaving both refs null and producing a
-            // silent-null return after future.get().
+            // silent no-match return after future.get().
             var future = evalExecutor().submit(() -> {
                 try {
                     var result = this.parsedExpression.evaluate(data, frame);
-                    resultRef.set(result != null ? MAPPER.valueToTree(result) : NullNode.getInstance());
+                    // A `null` here is JSONata's undefined - no match - and is propagated as such.
+                    resultRef.set(result == null ? null : MAPPER.valueToTree(result));
                 } catch (Throwable t) {
                     errorRef.set(t);
                 }

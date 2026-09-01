@@ -45,6 +45,22 @@ class TransformValueTest {
     }
 
     @Test
+    void shouldReturnNullValueWhenExpressionMatchesNothing() throws Exception {
+        // TransformValue always produces one output, so a no-match stays a null value here — only
+        // TransformItems drops the record (kestra-io/plugin-transform#111).
+        RunContext runContext = runContextFactory.of();
+        TransformValue task = TransformValue.builder()
+            .from(Property.ofValue("{\"products\": []}"))
+            .expression(Property.ofValue("products.{\"t\": title}"))
+            .build();
+
+        TransformValue.Output output = task.run(runContext);
+
+        Assertions.assertNotNull(output);
+        assertThat(output.getValue()).isEqualTo(com.fasterxml.jackson.databind.node.NullNode.getInstance());
+    }
+
+    @Test
     void shouldGetOutputForValidExprReturningObjectForFromJSON() throws Exception {
         // Given
         RunContext runContext = runContextFactory.of();

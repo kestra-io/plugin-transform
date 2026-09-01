@@ -3,6 +3,7 @@ package io.kestra.plugin.transform.jsonata;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.NullNode;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -104,11 +105,11 @@ public class TransformValue extends Transform<TransformValue.Output> implements 
         try {
             final JsonNode from = parseJson(runContext.render(this.from).as(String.class).orElseThrow());
 
-            // transform
+            // transform - an expression matching nothing yields a null output value
             JsonNode transformed = evaluateExpression(runContext, from);
 
             // output
-            return Output.builder().value(transformed).build();
+            return Output.builder().value(transformed != null ? transformed : NullNode.getInstance()).build();
         } finally {
             shutdownEvalExecutor();
         }
