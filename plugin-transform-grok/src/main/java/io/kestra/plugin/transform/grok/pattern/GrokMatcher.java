@@ -39,9 +39,11 @@ public final class GrokMatcher {
         Objects.requireNonNull(expression, "expression can't be null");
         this.patterns = patterns;
         this.expression = expression;
+        // Patterns are indexed by the name of the regex capture group they produce, i.e., their
+        // semantic when one is defined - see GrokPatternCompiler#compileRegex - otherwise their syntax.
         this.patternsByName = patterns
             .stream()
-            .collect(Collectors.toMap(GrokPattern::syntax, p -> p,  (p1, p2) -> p1.semantic() != null ? p1 : p2));
+            .collect(Collectors.toMap(GrokMatcher::captureNameOf, p -> p,  (p1, p2) -> p1.semantic() != null ? p1 : p2));
         byte[] bytes = expression.getBytes(StandardCharsets.UTF_8);
         regex = new Regex(bytes, 0, bytes.length, Option.NONE, UTF8Encoding.INSTANCE);
 
@@ -65,6 +67,10 @@ public final class GrokMatcher {
 
     public GrokPattern getGrokPattern(final String name) {
         return patternsByName.get(name);
+    }
+
+    private static String captureNameOf(final GrokPattern pattern) {
+        return pattern.semantic() != null ? pattern.semantic() : pattern.syntax();
     }
 
     /**

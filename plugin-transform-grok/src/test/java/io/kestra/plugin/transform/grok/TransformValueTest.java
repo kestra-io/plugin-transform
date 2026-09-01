@@ -175,4 +175,39 @@ class TransformValueTest {
             output.getValue()
         );
     }
+
+    @Test
+    public void shouldTransformGivenPatternWithIntTypeConverter() throws Exception {
+        // Given
+        RunContext runContext = runContextFactory.of();
+        TransformValue task = TransformValue.builder()
+            .pattern(Property.ofValue("%{NUMBER:n:int}"))
+            .from(Property.ofValue("7"))
+            .build();
+
+        // When
+        TransformValue.Output output = task.run(runContext);
+
+        // Then
+        Assertions.assertEquals(Map.of("n", 7), output.getValue());
+    }
+
+    @Test
+    public void shouldTransformGivenPatternWithMultipleTypeConverters() throws Exception {
+        // Given
+        RunContext runContext = runContextFactory.of();
+        TransformValue task = TransformValue.builder()
+            .pattern(Property.ofValue("%{IP:client_ip} %{NUMBER:duration:float} %{NUMBER:bytes:long} %{WORD:cached:boolean}"))
+            .from(Property.ofValue("192.168.1.1 1.5 4096 true"))
+            .build();
+
+        // When
+        TransformValue.Output output = task.run(runContext);
+
+        // Then
+        Assertions.assertEquals(
+            Map.of("client_ip", "192.168.1.1", "duration", 1.5F, "bytes", 4096L, "cached", true),
+            output.getValue()
+        );
+    }
 }

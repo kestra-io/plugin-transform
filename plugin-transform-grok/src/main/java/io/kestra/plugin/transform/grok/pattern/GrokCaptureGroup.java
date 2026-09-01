@@ -33,7 +33,21 @@ public record GrokCaptureGroup(
      * @return the GrokCaptureExtractor
      */
     public GrokCaptureExtractor getExtractor(final Consumer<Object> consumer) {
-        return new RawValueExtractor(backRefs, (s -> consumer.accept(type.convert(s))));
+        return new RawValueExtractor(backRefs, (s -> consumer.accept(convert(s))));
+    }
+
+    private Object convert(final String value) {
+        // An unmatched optional group is captured as an empty string: there is nothing to convert,
+        // and it is either dropped or kept as-is depending on the `keepEmptyCaptures` property.
+        if (type == Type.STRING || value.isEmpty()) {
+            return value;
+        }
+        try {
+            return type.convert(value);
+        } catch (IllegalArgumentException e) {
+            throw new GrokException(
+                "Failed to convert captured value '" + value + "' for field '" + name + "' to type " + type + ".", e);
+        }
     }
 
     private record RawValueExtractor(int[] backRefs, Consumer<String> consumer) implements GrokCaptureExtractor {
