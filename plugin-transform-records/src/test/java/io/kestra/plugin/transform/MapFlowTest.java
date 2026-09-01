@@ -33,6 +33,28 @@ class MapFlowTest {
         assertThat(record.get("total").toString(), is("15.25"));
     }
 
+    /**
+     * Reproduces <a href="https://github.com/kestra-io/plugin-transform/issues/109">#109</a> with the flow from the
+     * report: a present-but-null {@code b} used to fail the task with {@code Missing required field: b} under the
+     * default {@code onError: FAIL}.
+     */
+    @Test
+    @ExecuteFlow("flows/map_flow_present_null.yaml")
+    void executesPresentNullFlow(Execution execution) {
+        assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
+
+        TaskRun taskRun = execution.findTaskRunsByTaskId("map").getFirst();
+        Map<String, Object> outputs = (Map<String, Object>) taskRun.getOutputs();
+        List<Map<String, Object>> records = (List<Map<String, Object>>) outputs.get("records");
+
+        assertThat(records, hasSize(2));
+        assertThat(((Number) records.getFirst().get("a")).longValue(), is(1L));
+        // dropNulls defaults to true, so the null b is omitted rather than failing the record.
+        assertThat(records.getFirst().containsKey("b"), is(false));
+        assertThat(((Number) records.get(1).get("a")).longValue(), is(2L));
+        assertThat(records.get(1).get("b"), is("set"));
+    }
+
     @Test
     @ExecuteFlow("flows/map_flow_store.yaml")
     void executesStoreFlow(Execution execution) {

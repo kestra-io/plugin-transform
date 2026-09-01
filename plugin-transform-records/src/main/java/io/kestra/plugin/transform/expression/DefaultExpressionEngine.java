@@ -90,7 +90,12 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
             if (index >= segments.size()) {
                 return value;
             }
-            if (IonValueUtils.isNull(value)) {
+            if (value == null) {
+                // The parent is absent, so the whole path is absent: keep signalling it with a Java null.
+                return null;
+            }
+            if (value.isNullValue()) {
+                // The parent is present with a null value, so the path resolves to an explicit null.
                 return IonValueUtils.nullValue();
             }
             PathSegment segment = segments.get(index);
@@ -102,7 +107,10 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
             }
 
             if (segment.arrayExpand()) {
-                if (IonValueUtils.isNull(nextValue)) {
+                if (nextValue == null) {
+                    return null;
+                }
+                if (nextValue.isNullValue()) {
                     return IonValueUtils.nullValue();
                 }
                 if (!(nextValue instanceof IonList list)) {
@@ -121,14 +129,18 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
                 return result;
             }
             if (segment.arrayIndex() != null) {
-                if (IonValueUtils.isNull(nextValue)) {
+                if (nextValue == null) {
+                    return null;
+                }
+                if (nextValue.isNullValue()) {
                     return IonValueUtils.nullValue();
                 }
                 if (!(nextValue instanceof IonList list)) {
                     throw new ExpressionException("Expected list for segment '" + segment.name() + "[" + segment.arrayIndex() + "]'");
                 }
                 if (segment.arrayIndex() < 0 || segment.arrayIndex() >= list.size()) {
-                    return IonValueUtils.nullValue();
+                    // Out of range: there is no such element, which is an absence rather than a null element.
+                    return null;
                 }
                 nextValue = list.get(segment.arrayIndex());
             }

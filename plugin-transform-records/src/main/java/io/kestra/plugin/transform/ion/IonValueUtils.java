@@ -34,6 +34,16 @@ public final class IonValueUtils {
         return value == null || value.isNullValue();
     }
 
+    /**
+     * Whether an expression resolved to nothing, i.e. the field it points at is not present on the record.
+     * <p>
+     * A field that is present with a null value resolves to an Ion null and is <em>not</em> absent, so callers that
+     * enforce required fields must use this instead of {@link #isNull(IonValue)}.
+     */
+    public static boolean isAbsent(IonValue value) {
+        return value == null;
+    }
+
     public static IonValue nullValue() {
         return SYSTEM.newNull();
     }
