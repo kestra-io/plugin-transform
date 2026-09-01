@@ -22,6 +22,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -305,5 +306,109 @@ class TransformItemsTest {
 
         Assertions.assertEquals(1, transformationResult.size());
         Assertions.assertEquals("ThinkPad by Lenovo", transformationResult.get(0));
+    }
+
+    @Test
+    void shouldNotWriteRecordWhenExpressionMatchesNothing() throws Exception {
+        // Regression: kestra-io/plugin-transform#111. An expression matching nothing used to be written
+        // out as a phantom `null` record (4-byte output file, processedItemsTotal=1).
+        RunContext runContext = runContextFactory.of();
+        URI uri = writeItems(runContext, Map.of("products", List.of()));
+
+        TransformItems task = TransformItems.builder()
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue("products.{\"t\": title}"))
+            .build();
+
+        TransformItems.Output output = task.run(runContext);
+
+        Assertions.assertEquals(0, output.getProcessedItemsTotal());
+        Assertions.assertEquals(0, readRaw(runContext, output.getUri()).length());
+    }
+
+    @Test
+    void shouldNotWriteRecordWhenExpressionReferencesUnknownRoot() throws Exception {
+        // Regression: kestra-io/plugin-transform#111 — same phantom record for a non-existent root.
+        RunContext runContext = runContextFactory.of();
+        URI uri = writeItems(runContext, Map.of("products", List.of(Map.of("title", "ThinkPad"))));
+
+        TransformItems task = TransformItems.builder()
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue("doesNotExist.title"))
+            .build();
+
+        TransformItems.Output output = task.run(runContext);
+
+        Assertions.assertEquals(0, output.getProcessedItemsTotal());
+        Assertions.assertEquals(0, readRaw(runContext, output.getUri()).length());
+    }
+
+    @Test
+    void shouldOnlyWriteMatchingRecordsWhenSomeItemsMatchNothing() throws Exception {
+        // Regression: kestra-io/plugin-transform#111 — non-matching items must be dropped, not turned
+        // into null records that shift the downstream row count.
+        RunContext runContext = runContextFactory.of();
+        URI uri = writeItems(
+            runContext,
+            Map.of("title", "ThinkPad"),
+            Map.of("other", "no title here"),
+            Map.of("title", "MacBook")
+        );
+
+        TransformItems task = TransformItems.builder()
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue("title"))
+            .build();
+
+        TransformItems.Output output = task.run(runContext);
+
+        Assertions.assertEquals(2, output.getProcessedItemsTotal());
+
+        InputStream is = runContext.storage().getFile(output.getUri());
+        List<String> transformationResult = FileSerde.readAll(new InputStreamReader(is), new TypeReference<String>() {
+        }).collectList().block();
+
+        Assertions.assertEquals(List.of("ThinkPad", "MacBook"), transformationResult);
+    }
+
+    @Test
+    void shouldKeepRecordWhoseResultMerelyContainsNulls() throws Exception {
+        // Guard for the kestra-io/plugin-transform#111 fix: only a no-match is dropped. A result that is
+        // itself a value containing nulls is still a match and must be written.
+        RunContext runContext = runContextFactory.of();
+        URI uri = writeItems(runContext, Map.of("title", "ThinkPad"));
+
+        TransformItems task = TransformItems.builder()
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue("[1, null, 2]"))
+            .explodeArray(Property.ofValue(false))
+            .build();
+
+        TransformItems.Output output = task.run(runContext);
+
+        Assertions.assertEquals(1, output.getProcessedItemsTotal());
+
+        InputStream is = runContext.storage().getFile(output.getUri());
+        List<List> transformationResult = FileSerde.readAll(new InputStreamReader(is), new TypeReference<List>() {
+        }).collectList().block();
+
+        Assertions.assertEquals(1, transformationResult.size());
+        Assertions.assertEquals(Arrays.asList(1, null, 2), transformationResult.getFirst());
+    }
+
+    @SafeVarargs
+    private URI writeItems(RunContext runContext, Map<String, Object>... items) throws Exception {
+        final Path outputFilePath = runContext.workingDir().createTempFile(".ion");
+        try (final Writer writer = new OutputStreamWriter(Files.newOutputStream(outputFilePath))) {
+            FileSerde.writeAll(writer, Flux.fromArray(items)).block();
+            writer.flush();
+        }
+        return runContext.storage().putFile(outputFilePath.toFile());
+    }
+
+    private String readRaw(RunContext runContext, URI uri) throws Exception {
+        try (InputStream is = runContext.storage().getFile(uri)) {
+            return new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
     }
 }

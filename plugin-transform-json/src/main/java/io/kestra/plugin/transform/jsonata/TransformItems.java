@@ -129,8 +129,9 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
                 final Path outputFilePath = runContext.workingDir().createTempFile(".ion");
                 try (Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(outputFilePath)))) {
 
-                    // transform
-                    Flux<JsonNode> values = flux.map(node -> this.evaluateExpression(runContext, node));
+                    // transform - items whose expression matches nothing are skipped rather than
+                    // written out as a null record (see #111)
+                    Flux<JsonNode> values = flux.mapNotNull(node -> this.evaluateExpression(runContext, node));
 
                     if (runContext.render(explodeArray).as(Boolean.class).orElseThrow()) {
                         values = values.flatMap(jsonNode -> {
