@@ -121,6 +121,7 @@ class TransformItemsTest {
             2020-12-14T12:18:51.397Z INFO Your output is: 12345
             2020-12-14T12:18:51.397Z WARN Warning message!!
             2020-12-14T12:18:51.397Z ERROR Somethiong went wrong..
+            2020-12-14T12:18:51.397Z INFO "GET /index.html HTTP/1.1" 200 1234
             DEBUG:root:This message should go to the log file
             ERROR:root:Got exception on main handler
             Traceback (most recent call last):
@@ -141,7 +142,7 @@ class TransformItemsTest {
         var output = task.run(runContext);
 
         assertThat(output, notNullValue());
-        assertThat(output.getProcessedItemsTotal().intValue(), is(5));
+        assertThat(output.getProcessedItemsTotal().intValue(), is(6));
 
         InputStream is = runContext.storage().getFile(output.getUri());
         List<Map<String, Object>> items = FileSerde
@@ -154,8 +155,16 @@ class TransformItemsTest {
             allOf(hasEntry("loglevel", "INFO"), hasEntry("message", "Your output is: 12345")),
             allOf(hasEntry("loglevel", "WARN"), hasEntry("message", "Warning message!!")),
             allOf(hasEntry("loglevel", "ERROR"), hasEntry("message", "Somethiong went wrong..")),
+            allOf(hasEntry("loglevel", "INFO"), hasEntry("message", "\"GET /index.html HTTP/1.1\" 200 1234")),
             allOf(hasEntry("loglevel", "INFO"), hasEntry("message", "Hi from Kestra team!"))
         ));
+    }
+
+    @Test
+    public void shouldKeepQuotedPlainTextLinesWhenTrailingTokensExist() {
+        assertThat(TransformItems.decodeItem("\"GET /index.html HTTP/1.1\" 200 1234"), is("\"GET /index.html HTTP/1.1\" 200 1234"));
+        assertThat(TransformItems.decodeItem("\"hello\""), is("hello"));
+        assertThat(TransformItems.decodeItem("  \"hello\"  "), is("hello"));
     }
 
 }
