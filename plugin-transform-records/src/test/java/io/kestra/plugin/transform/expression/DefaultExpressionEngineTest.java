@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.lang.reflect.Field;
+import java.util.List;
 import java.util.Map;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -128,7 +129,7 @@ class DefaultExpressionEngineTest {
     }
 
     @Test
-    void returnsNullForOutOfBoundsArrayIndex() throws Exception {
+    void returnsAbsentForOutOfBoundsArrayIndex() throws Exception {
         DefaultExpressionEngine engine = new DefaultExpressionEngine();
         IonStruct record = IonValueUtils.system().newEmptyStruct();
         var products = IonValueUtils.system().newEmptyList();
@@ -138,9 +139,59 @@ class DefaultExpressionEngineTest {
         products.add(first);
         record.put("products", products);
 
-        IonValue value = engine.evaluate("products[3].title", record);
+        // There is no such element, so the path is absent rather than resolving to a present null element.
+        assertThat(IonValueUtils.isAbsent(engine.evaluate("products[3].title", record)), is(true));
+        assertThat(IonValueUtils.isAbsent(engine.evaluate("products[3]", record)), is(true));
+    }
 
-        assertThat(IonValueUtils.isNull(value), is(true));
+    @Test
+    void returnsAbsentForAbsentPathAndPresentNullForNullValue() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+
+        IonStruct user = IonValueUtils.system().newEmptyStruct();
+        user.put("nullAddress", IonValueUtils.nullValue());
+        record.put("user", user);
+        record.put("nullUser", IonValueUtils.nullValue());
+
+        // A top-level or nested field that is not on the record at all is absent.
+        assertThat(IonValueUtils.isAbsent(engine.evaluate("missing", record)), is(true));
+        assertThat(IonValueUtils.isAbsent(engine.evaluate("user.address", record)), is(true));
+        assertThat(IonValueUtils.isAbsent(engine.evaluate("user.address.city", record)), is(true));
+        assertThat(IonValueUtils.isAbsent(engine.evaluate("missing.deeply.nested", record)), is(true));
+
+        // A field that is present holding a null is not absent, at the leaf or anywhere along the path.
+        IonValue nullLeaf = engine.evaluate("user.nullAddress", record);
+        assertThat(IonValueUtils.isAbsent(nullLeaf), is(false));
+        assertThat(IonValueUtils.isNull(nullLeaf), is(true));
+
+        IonValue throughNull = engine.evaluate("user.nullAddress.city", record);
+        assertThat(IonValueUtils.isAbsent(throughNull), is(false));
+        assertThat(IonValueUtils.isNull(throughNull), is(true));
+
+        IonValue throughNullRoot = engine.evaluate("nullUser.name", record);
+        assertThat(IonValueUtils.isAbsent(throughNullRoot), is(false));
+        assertThat(IonValueUtils.isNull(throughNullRoot), is(true));
+    }
+
+    @Test
+    void returnsAbsentForAbsentListAndPresentNullForNullList() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+        record.put("nullItems", IonValueUtils.nullValue());
+
+        // No list at all, whether expanded or indexed, is an absence.
+        assertThat(IonValueUtils.isAbsent(engine.evaluate("items[]", record)), is(true));
+        assertThat(IonValueUtils.isAbsent(engine.evaluate("items[].price", record)), is(true));
+        assertThat(IonValueUtils.isAbsent(engine.evaluate("items[0]", record)), is(true));
+        assertThat(IonValueUtils.isAbsent(engine.evaluate("items[0].price", record)), is(true));
+
+        // A list field present with a null value resolves to an explicit null instead.
+        for (String expression : List.of("nullItems[]", "nullItems[].price", "nullItems[0]", "nullItems[0].price")) {
+            IonValue value = engine.evaluate(expression, record);
+            assertThat(expression, IonValueUtils.isAbsent(value), is(false));
+            assertThat(expression, IonValueUtils.isNull(value), is(true));
+        }
     }
 
     @Test

@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 
@@ -105,7 +106,7 @@ class MapTest {
 
     @Test
     void outputModeUriIsRejected() {
-        org.junit.jupiter.api.Assertions.assertThrows(
+        assertThrows(
             IllegalArgumentException.class,
             () -> Map.OutputMode.from("URI")
         );
@@ -200,7 +201,7 @@ class MapTest {
             .onError(Property.ofValue(TransformOptions.OnErrorMode.FAIL))
             .build();
 
-        TransformException exception = org.junit.jupiter.api.Assertions.assertThrows(
+        TransformException exception = assertThrows(
             TransformException.class,
             () -> task.run(runContext)
         );
@@ -271,7 +272,7 @@ class MapTest {
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
 
-        TransformException exception = org.junit.jupiter.api.Assertions.assertThrows(
+        TransformException exception = assertThrows(
             TransformException.class,
             () -> task.run(runContext)
         );
@@ -290,7 +291,7 @@ class MapTest {
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
 
-        TransformException exception = org.junit.jupiter.api.Assertions.assertThrows(
+        TransformException exception = assertThrows(
             TransformException.class,
             () -> task.run(runContext)
         );
