@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 
@@ -105,7 +106,7 @@ class MapTest {
 
     @Test
     void outputModeUriIsRejected() {
-        org.junit.jupiter.api.Assertions.assertThrows(
+        assertThrows(
             IllegalArgumentException.class,
             () -> Map.OutputMode.from("URI")
         );
@@ -136,6 +137,76 @@ class MapTest {
         java.util.Map<String, Object> second = (java.util.Map<String, Object>) output.getRecords().get(1);
         assertThat(first.get("value"), is(1L));
         assertThat(second.get("value"), is(2L));
+    }
+
+    /**
+     * Reproduces <a href="https://github.com/kestra-io/plugin-transform/issues/109">#109</a>: a field that is present
+     * with a null value is not a missing field, so the default {@code onError: FAIL} must not reject the record.
+     */
+    @Test
+    void keepsPresentButNullValueWithDefaultOnError() throws Exception {
+        String ionText = "[{a: 1, b: null}, {a: 2, b: \"set\"}]";
+
+        RunContext runContext = runContextFactory.of(java.util.Map.of());
+        var uri = runContext.storage().putFile(
+            new ByteArrayInputStream(ionText.getBytes(StandardCharsets.UTF_8)),
+            "records-present-null.ion"
+        );
+
+        Map task = Map.builder()
+            .from(Property.ofValue(uri.toString()))
+            .fields(Property.ofValue(java.util.Map.of(
+                "a", Map.FieldDefinition.builder().expr("a").build(),
+                "b", Map.FieldDefinition.builder().expr("b").build()
+            )))
+            .outputType(Property.ofValue(Map.OutputMode.RECORDS))
+            .onError(Property.ofValue(TransformOptions.OnErrorMode.FAIL))
+            .dropNulls(Property.ofValue(false))
+            .build();
+
+        Map.Output output = task.run(runContext);
+
+        assertThat(output.getRecords(), hasSize(2));
+        java.util.Map<String, Object> first = (java.util.Map<String, Object>) output.getRecords().getFirst();
+        assertThat(first.get("a"), is(1L));
+        assertThat(first.containsKey("b"), is(true));
+        assertThat(first.get("b"), is((Object) null));
+
+        java.util.Map<String, Object> second = (java.util.Map<String, Object>) output.getRecords().get(1);
+        assertThat(second.get("a"), is(2L));
+        assertThat(second.get("b"), is("set"));
+    }
+
+    /**
+     * Counterpart of {@link #keepsPresentButNullValueWithDefaultOnError()}: a genuinely absent field is still a
+     * missing required field.
+     */
+    @Test
+    void stillFailsOnAbsentRequiredFieldWithDefaultOnError() throws Exception {
+        String ionText = "[{a: 1}]";
+
+        RunContext runContext = runContextFactory.of(java.util.Map.of());
+        var uri = runContext.storage().putFile(
+            new ByteArrayInputStream(ionText.getBytes(StandardCharsets.UTF_8)),
+            "records-absent.ion"
+        );
+
+        Map task = Map.builder()
+            .from(Property.ofValue(uri.toString()))
+            .fields(Property.ofValue(java.util.Map.of(
+                "a", Map.FieldDefinition.builder().expr("a").build(),
+                "b", Map.FieldDefinition.builder().expr("b").build()
+            )))
+            .outputType(Property.ofValue(Map.OutputMode.RECORDS))
+            .onError(Property.ofValue(TransformOptions.OnErrorMode.FAIL))
+            .build();
+
+        TransformException exception = assertThrows(
+            TransformException.class,
+            () -> task.run(runContext)
+        );
+
+        assertThat(exception.getMessage(), is("Missing required field: b"));
     }
 
     @Test
@@ -201,7 +272,7 @@ class MapTest {
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
 
-        TransformException exception = org.junit.jupiter.api.Assertions.assertThrows(
+        TransformException exception = assertThrows(
             TransformException.class,
             () -> task.run(runContext)
         );
@@ -220,7 +291,7 @@ class MapTest {
 
         RunContext runContext = runContextFactory.of(java.util.Map.of());
 
-        TransformException exception = org.junit.jupiter.api.Assertions.assertThrows(
+        TransformException exception = assertThrows(
             TransformException.class,
             () -> task.run(runContext)
         );

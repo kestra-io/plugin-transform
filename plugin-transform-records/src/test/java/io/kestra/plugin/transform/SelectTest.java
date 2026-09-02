@@ -499,6 +499,39 @@ class SelectTest {
         assertThat(record.get("total_spent"), is("not-a-number"));
     }
 
+    /**
+     * Same root cause as <a href="https://github.com/kestra-io/plugin-transform/issues/109">#109</a>: Select shares
+     * the required-field check, so a present-but-null value must not be reported as missing either.
+     */
+    @Test
+    void keepsPresentButNullValueWhenOptionalFalse() throws Exception {
+        String ion = "[{customer_id: \"c1\", total_spent: null}]";
+
+        RunContext runContext = runContextFactory.of(Map.of());
+        URI uri = runContext.storage().putFile(
+            new ByteArrayInputStream(ion.getBytes(StandardCharsets.UTF_8)),
+            "select-present-null.ion"
+        );
+
+        Select task = Select.builder()
+            .inputs(List.of(Property.ofValue(uri.toString())))
+            .fields(Property.ofValue(Map.of(
+                "customer_id", Select.FieldDefinition.builder().expr("customer_id").optional(false).build(),
+                "total_spent", Select.FieldDefinition.builder().expr("total_spent").optional(false).build()
+            )))
+            .dropNulls(Property.ofValue(false))
+            .outputType(Property.ofValue(Select.OutputMode.RECORDS))
+            .build();
+
+        Select.Output output = task.run(runContext);
+
+        assertThat(output.getRecords(), hasSize(1));
+        Map<String, Object> record = (Map<String, Object>) output.getRecords().getFirst();
+        assertThat(record.get("customer_id"), is("c1"));
+        assertThat(record.containsKey("total_spent"), is(true));
+        assertThat(record.get("total_spent"), is((Object) null));
+    }
+
     @Test
     void rejectsMissingRequiredFieldWhenOptionalFalse() {
         List<Map<String, Object>> left = List.of(Map.of("customer_id", "c1"));

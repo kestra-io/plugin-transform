@@ -492,7 +492,8 @@ public class Map extends Task implements RunnableTask<Map.Output> {
         @Schema(
             title = "Optional",
             description = """
-            When true, allows the field to be omitted when the evaluated value is null.
+            When true, allows the field to be absent from the input record.
+            A field that is present with a null value is always allowed and maps to null, whatever this is set to.
             Expression and cast errors are still handled by onError.
             """
         )

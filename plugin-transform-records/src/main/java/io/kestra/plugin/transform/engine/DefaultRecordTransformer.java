@@ -62,10 +62,9 @@ public final class DefaultRecordTransformer implements RecordTransformer {
             IonValue evaluated;
             try {
                 evaluated = expressionEngine.evaluate(mapping.expression(), input);
-                if (IonValueUtils.isNull(evaluated)) {
-                    if (!mapping.optional()) {
-                        throw new TransformException("Missing required field: " + mapping.targetField());
-                    }
+                // A field present with a null value is not a missing field: only an absent one is.
+                if (IonValueUtils.isAbsent(evaluated) && !mapping.optional()) {
+                    throw new TransformException("Missing required field: " + mapping.targetField());
                 }
                 IonValue casted = IonValueUtils.isNull(evaluated)
                     ? IonValueUtils.nullValue()

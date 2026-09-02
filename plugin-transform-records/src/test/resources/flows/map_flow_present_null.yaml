@@ -1,0 +1,17 @@
+id: map_flow_present_null
+namespace: io.kestra.tests
+
+tasks:
+  - id: write
+    type: io.kestra.plugin.core.storage.Write
+    extension: .json
+    content: '[{"a":1,"b":null},{"a":2,"b":"set"}]'
+
+  - id: map
+    type: io.kestra.plugin.transform.Map
+    from: "{{ outputs.write.uri }}"
+    outputType: RECORDS
+    onError: FAIL
+    fields:
+      a: a
+      b: b

@@ -35,6 +35,28 @@ class DefaultRecordTransformerTest {
         assertThat(exception.getMessage(), is("Missing required field: value"));
     }
 
+    /**
+     * Reproduces <a href="https://github.com/kestra-io/plugin-transform/issues/109">#109</a> at its root: the
+     * required-field check must distinguish an absent field from a field present with a null value.
+     */
+    @Test
+    void keepsFieldPresentWithNullValue() throws Exception {
+        DefaultRecordTransformer transformer = new DefaultRecordTransformer(
+            List.of(new FieldMapping("value", "value", null, false)),
+            new DefaultExpressionEngine(),
+            new DefaultIonCaster(),
+            new TransformOptions(false, false, TransformOptions.OnErrorMode.FAIL)
+        );
+
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+        record.put("value", IonValueUtils.system().newNull());
+
+        IonStruct output = transformer.transform(record);
+
+        assertThat(output.containsKey("value"), is(true));
+        assertThat(IonValueUtils.isNull(output.get("value")), is(true));
+    }
+
     @Test
     void nullsFieldOnErrorWhenConfigured() throws Exception {
         DefaultRecordTransformer transformer = new DefaultRecordTransformer(
