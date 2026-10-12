@@ -1,0 +1,3 @@
+name: arrow
+title: Arrow & Parquet Transform
+description: Transform Arrow, Parquet, CSV, or NDJSON data using jq-style queries via aq.
