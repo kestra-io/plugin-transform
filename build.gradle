@@ -1,15 +1,5 @@
-description = 'Kestra plugin for Arrow and Parquet transforms via jq'
+Description = 'Kestra plugin for Arrow and Parquet transforms via jq'
 
 dependencies {
     // Add any necessary runtime dependencies here if required by the implementation
-}
-
-jar {
-    manifest {
-        attributes(
-            'X-Kestra-Name': project.name,
-            'X-Kestra-Description': project.description,
-            'X-Kestra-Version': project.version
-        )
-    }
 }
