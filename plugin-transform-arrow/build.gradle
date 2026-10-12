@@ -1,28 +1,17 @@
-plugins {
-    id 'biz.aQute.bnd.builder'
-}
-
-description = 'Kestra plugin for Arrow and Parquet transforms via jq'
+description = 'Kestra Plugin Transformation for Arrow'
 
 jar {
     manifest {
         attributes(
+            'X-Kestra-Name': 'plugin-transform-arrow',
             'X-Kestra-Title': 'Arrow',
-            'X-Kestra-Group': 'io.kestra.plugin.transform.arrow'
+            'X-Kestra-Group': project.group + ".transform.arrow",
+            'X-Kestra-Description': 'Transform Arrow, Parquet, CSV, or NDJSON data using jq-style queries via jq.',
+            'X-Kestra-Version': project.version
         )
     }
 }
 
 dependencies {
-    api project(':core')
-    implementation 'net.thisptr:jackson-jq:1.6.5'
-    implementation 'org.apache.arrow:arrow-vector:19.0.0'
-    implementation 'org.apache.arrow:arrow-memory-netty:19.0.0'
-    implementation 'org.apache.parquet:parquet-hadoop:1.18.1'
-    implementation 'de.siegmar:fastcsv:3.4.0'
-    testImplementation project(':core').sourceSets.test.output
-}
-
-test {
-    jvmArgs '--add-opens', 'java.base/java.nio=ALL-UNNAMED'
+    // Add only the dependencies your implementation uses cleanly
 }
