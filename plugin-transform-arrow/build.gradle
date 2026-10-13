@@ -1,17 +1,16 @@
-description = 'Kestra Plugin Transformation for Arrow'
-
-jar {
-    manifest {
-        attributes(
-            'X-Kestra-Name': 'plugin-transform-arrow',
-            'X-Kestra-Title': 'Arrow',
-            'X-Kestra-Group': project.group + ".transform.arrow",
-            'X-Kestra-Description': 'Transform Arrow, Parquet, CSV, or NDJSON data using jq-style queries via jq.',
-            'X-Kestra-Version': project.version
-        )
-    }
+plugins {
+    id 'com.github.johnrengelman.shadow' version '8.1.1' apply false
+    id 'com.diffplug.spotless' version '6.25.0' apply false
 }
 
-dependencies {
-    // Add only the dependencies your implementation uses cleanly
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'com.github.johnrengelman.shadow'
+    
+    group = "io.kestra.plugin.transform"
+    version = "0.15.0-SNAPSHOT"
+
+    repositories {
+        mavenCentral()
+    }
 }
