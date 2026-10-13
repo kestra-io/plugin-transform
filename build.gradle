@@ -1,5 +1,14 @@
-Description = 'Kestra plugin for Arrow and Parquet transforms via jq'
+plugins {
+    id 'com.diffplug.spotless' version '6.25.0' apply false
+}
 
-dependencies {
-    // Add any necessary runtime dependencies here if required by the implementation
+subprojects {
+    apply plugin: 'java'
+    
+    group = "io.kestra.plugin.transform"
+    version = "0.15.0-SNAPSHOT"
+
+    repositories {
+        mavenCentral()
+    }
 }
