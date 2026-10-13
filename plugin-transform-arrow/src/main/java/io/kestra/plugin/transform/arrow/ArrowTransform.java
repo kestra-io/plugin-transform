@@ -1,20 +1,20 @@
 package io.kestra.plugin.transform.arrow;
 
-import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.models.property.Property;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.io.File;
 import java.io.InputStream;
@@ -27,54 +27,45 @@ import java.nio.file.StandardCopyOption;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@Schema(
-    title = "Transform Arrow, Parquet, CSV, or NDJSON data using jq-style queries."
-)
 @Plugin(
-    examples = {
-        @Example(
-            full = true,
-            title = "Transform data using a jq query",
-            code = """
-id: arrow_transform
-namespace: company.team
-tasks:
-  - id: transform
-    type: io.kestra.plugin.transform.arrow.ArrowTransform
-    from: "{{ inputs.file }}"
-    query: ".[] | select(.age > 30)"
-            """
-        )
-    }
+    examples = {}
+)
+@Schema(
+    title = "Transform Arrow, Parquet, or data files using queries."
 )
 public class ArrowTransform extends Task implements RunnableTask<ArrowTransform.Output> {
-   @Schema(
-        title = "Internal storage URI of the file to transform"
+
+    @Schema(
+        title = "The source file URI"
     )
-    @PluginProperty(group = "main", internalStorageURI = true)
+    @PluginProperty(group = "main")
     @NotNull
     private Property<String> from;
 
     @Schema(
-        title = "The jq query to execute"
+        title = "The query to execute"
     )
     @PluginProperty(group = "main")
     @NotNull
     private Property<String> query;
-    @Override  
-  public Output run(RunContext runContext) throws Exception {
+
+    @Override
+    public Output run(RunContext runContext) throws Exception {
         String renderedFrom = runContext.render(this.from).as(String.class)
             .orElseThrow(() -> new IllegalArgumentException("'from' must render to a kestra:// URI"));
-          String renderedQuery = runContext.render(this.query).as(String.class)
+        String renderedQuery = runContext.render(this.query).as(String.class)
             .orElseThrow(() -> new IllegalArgumentException("'query' must render to a valid jq string"));
- // Download file from internal storage
-        File tempFile = File.createTempFile("arrow-", ".data");
+
+        // Use working directory for temp files to prevent leaks
+        File tempFile = runContext.workingDir().createTempFile("arrow-", ".data");
         try (InputStream inputStream = runContext.storage().getFile(URI.create(renderedFrom))) {
             Files.copy(inputStream, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
         }
 
-        // Output destination URI
-        URI outputUri = runContext.storage().putFile(File.createTempFile("output-", ".json"));
+        // TODO: Implement actual jq / arrow transform logic using renderedQuery on tempFile,
+        // write to a result file, and return its URI. For now, returning proper structure safely.
+        File resultFile = runContext.workingDir().createTempFile("output-", ".json");
+        URI outputUri = runContext.storage().putFile(resultFile);
 
         return Output.builder()
             .uri(outputUri)
@@ -86,8 +77,7 @@ public class ArrowTransform extends Task implements RunnableTask<ArrowTransform.
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
             title = "The URI of the transformed file in internal storage"
-        }
+        )
         private URI uri;
     }
-          }
-          
+            }
