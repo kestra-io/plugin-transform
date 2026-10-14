@@ -1,16 +1,9 @@
 plugins {
-    id 'com.github.johnrengelman.shadow' version '8.1.1' apply false
-    id 'com.diffplug.spotless' version '6.25.0' apply false
+    id "io.kestra.gradle.plugin"
 }
 
-subprojects {
-    apply plugin: 'java'
-    apply plugin: 'com.github.johnrengelman.shadow'
-    
-    group = "io.kestra.plugin.transform"
-    version = "0.15.0-SNAPSHOT"
-
-    repositories {
-        mavenCentral()
-    }
+dependencies {
+    implementation("org.apache.arrow:arrow-vector:15.0.0")
+    implementation("org.apache.arrow:arrow-memory-netty:15.0.0")
+    implementation("org.apache.parquet:parquet-avro:1.13.1")
 }
