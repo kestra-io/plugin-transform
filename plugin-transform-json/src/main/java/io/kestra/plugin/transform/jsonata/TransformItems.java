@@ -123,8 +123,10 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
         try {
             final URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
-            try (Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE)) {
-                Flux<JsonNode> flux = FileSerde.readAll(reader, new TypeReference<>() {
+            // Read bytes, not characters: Kestra 2.x writes binary ION, which a Reader corrupts.
+            // The InputStream API of FileSerde reads both binary and text ION.
+            try (InputStream inputStream = new BufferedInputStream(runContext.storage().getFile(from), FileSerde.BUFFER_SIZE)) {
+                Flux<JsonNode> flux = FileSerde.readAll(inputStream, new TypeReference<>() {
                 });
                 final Path outputFilePath = runContext.workingDir().createTempFile(".ion");
                 try (Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(outputFilePath)))) {

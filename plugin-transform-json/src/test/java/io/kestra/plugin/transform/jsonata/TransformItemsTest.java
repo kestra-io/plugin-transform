@@ -2,6 +2,7 @@ package io.kestra.plugin.transform.jsonata;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.ion.IonObjectMapper;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
@@ -9,13 +10,18 @@ import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import reactor.core.publisher.Flux;
 
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.URI;
@@ -394,6 +400,83 @@ class TransformItemsTest {
 
         Assertions.assertEquals(1, transformationResult.size());
         Assertions.assertEquals(Arrays.asList(1, null, 2), transformationResult.getFirst());
+    }
+
+    @Test
+    void shouldReadItemsWrittenWithOutputStreamApi() throws Exception {
+        // Given: input written like Kestra tasks write it (binary ION from Kestra 2.x)
+        RunContext runContext = runContextFactory.of();
+        final Path inputFilePath = runContext.workingDir().createTempFile(".ion");
+        try (OutputStream outputStream = new BufferedOutputStream(Files.newOutputStream(inputFilePath))) {
+            FileSerde.writeAll(outputStream, Flux.just(
+                new ObjectMapper().readValue(Features.DATASET_ACCOUNT_ORDER_JSON, Map.class),
+                new ObjectMapper().readValue(Features.DATASET_ACCOUNT_ORDER_JSON, Map.class))).block();
+        }
+        URI uri = runContext.storage().putFile(inputFilePath.toFile());
+
+        TransformItems task = TransformItems.builder()
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue(Features.DATASET_ACCOUNT_ORDER_EXPR))
+            .build();
+
+        // When
+        TransformItems.Output output = task.run(runContext);
+
+        // Then
+        Assertions.assertEquals(2, output.getProcessedItemsTotal());
+        try (InputStream is = runContext.storage().getFile(output.getUri())) {
+            List<String> results = FileSerde.readAll(is, new TypeReference<String>() {
+            }).collectList().block();
+            Assertions.assertEquals(List.of(Features.DATASET_ACCOUNT_ORDER_EXPR_RESULT, Features.DATASET_ACCOUNT_ORDER_EXPR_RESULT), results);
+        }
+    }
+
+    @Test
+    void shouldReadBinaryIon() throws Exception {
+        byte[] binaryIon = binaryIon(Map.of("id", 1, "name", "alice"), Map.of("id", 2, "name", "bob"));
+        Assumptions.assumeTrue(coreReadsBinaryIon(binaryIon), "This Kestra core version reads text ION only");
+
+        // Given: a binary ION file (starts with the ION version marker E0 01 00 EA)
+        RunContext runContext = runContextFactory.of();
+        final Path inputFilePath = runContext.workingDir().createTempFile(".ion");
+        Files.write(inputFilePath, binaryIon);
+        URI uri = runContext.storage().putFile(inputFilePath.toFile());
+
+        TransformItems task = TransformItems.builder()
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue("name"))
+            .build();
+
+        // When
+        TransformItems.Output output = task.run(runContext);
+
+        // Then
+        Assertions.assertEquals(2, output.getProcessedItemsTotal());
+        try (InputStream is = runContext.storage().getFile(output.getUri())) {
+            List<String> names = FileSerde.readAll(is, new TypeReference<String>() {
+            }).collectList().block();
+            Assertions.assertEquals(List.of("alice", "bob"), names);
+        }
+    }
+
+    @SafeVarargs
+    private static byte[] binaryIon(Map<String, Object>... items) throws Exception {
+        IonObjectMapper binaryMapper = new IonObjectMapper();
+        binaryMapper.setCreateBinaryWriters(true);
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        for (Map<String, Object> item : items) {
+            bytes.write(binaryMapper.writeValueAsBytes(item));
+        }
+        return bytes.toByteArray();
+    }
+
+    private static boolean coreReadsBinaryIon(byte[] binaryIon) {
+        try {
+            List<Object> rows = FileSerde.readAll(new ByteArrayInputStream(binaryIon)).collectList().block();
+            return rows != null && rows.size() == 2;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @SafeVarargs
