@@ -15,11 +15,12 @@
 
 ### Architecture
 
-This is a **multi-module** plugin with 3 submodules:
+This is a **multi-module** plugin with 4 submodules:
 
 - `plugin-transform-grok`
 - `plugin-transform-json`
 - `plugin-transform-records`
+- `plugin-transform-arrow`
 
 ### Key Plugin Classes
 
@@ -39,6 +40,9 @@ This is a **multi-module** plugin with 3 submodules:
 - `io.kestra.plugin.transform.Select`
 - `io.kestra.plugin.transform.Unnest`
 - `io.kestra.plugin.transform.Zip`
+**plugin-transform-arrow:**
+
+- `io.kestra.plugin.transform.arrow.Query`
 
 ### Project Structure
 
