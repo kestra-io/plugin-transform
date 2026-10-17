@@ -1,0 +1,8 @@
+group: io.kestra.plugin.transform.arrow
+name: "arrow"
+title: "Arrow"
+description: "Tasks that query columnar data files using jq expressions."
+body: "Provide a Parquet, Arrow IPC, CSV or NDJSON file and a jq expression to filter, project or aggregate its rows with aq, emitting the result as Ion records or as a file in another format for downstream processing."
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
