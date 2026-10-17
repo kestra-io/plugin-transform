@@ -32,7 +32,7 @@ import io.kestra.core.models.annotations.PluginProperty;
         The `TransformValue` task is similar to the famous Logstash Grok filter from the ELK stack.
         It is particularly useful for transforming unstructured data such as logs into a structured, indexable, and queryable data structure.
 
-        The `TransformValue` ships with all the default patterns as defined You can find them here: https://github.com/kestra-io/plugin-transform/tree/main/plugin-transform-grok/src/main/resources/patterns.
+        The `TransformValue` ships with all the default patterns as defined. You can find them here: https://github.com/kestra-io/plugin-transform/tree/main/plugin-transform-grok/src/main/resources/patterns.
         """
 )
 @Plugin(
@@ -50,9 +50,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                     pattern: "%{TIMESTAMP_ISO8601:logdate} %{LOGLEVEL:loglevel} %{GREEDYDATA:message}"
                     from: "{{ trigger.value }}"
 
-                  - id: log_on_warn
+                  - id: log_on_error
                     type: io.kestra.plugin.core.flow.If
-                    condition: "{{ grok.value['LOGLEVEL'] == 'ERROR' }}"
+                    condition: "{{ outputs.transform_value.value.loglevel == 'ERROR' }}"
                     then:
                       - id: when_true
                         type: io.kestra.plugin.core.log.Log
