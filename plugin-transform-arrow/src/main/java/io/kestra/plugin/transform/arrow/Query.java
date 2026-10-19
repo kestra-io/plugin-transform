@@ -25,6 +25,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -179,6 +180,10 @@ public class Query extends Task implements RunnableTask<Query.Output> {
         var rFrom = runContext.render(this.from).as(String.class)
             .filter(value -> !value.isBlank())
             .orElseThrow(() -> new IllegalArgumentException("`from` must be a Kestra internal storage URI"));
+        // the task runner renders the input files again, so only an internal storage URI is accepted
+        if (!rFrom.startsWith("kestra://") || containsTemplate(rFrom)) {
+            throw new IllegalArgumentException("`from` must be a Kestra internal storage URI, got '" + rFrom + "'");
+        }
         var rInputFormat = inputFormat(rFrom, runContext.render(this.inputFormat).as(InputFormat.class).orElse(InputFormat.AUTO));
         var rOutputFormat = runContext.render(this.outputFormat).as(OutputFormat.class).orElse(OutputFormat.ION);
         var rContainerImage = runContext.render(this.containerImage).as(String.class)
@@ -206,9 +211,12 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
         var rExpression = runContext.render(this.expression).as(String.class);
         if (rExpression.isPresent()) {
+            // the task runner renders the environment values again, so a rendered expression containing a Pebble tag
+            // would be evaluated a second time: pass it Base64 encoded and decode it in the shell
             // aq reads its first argument as a file when it is an existing path, such as `.`
-            env.put("AQ_EXPRESSION", "(\n" + rExpression.get() + "\n)");
-            command.add("\"$AQ_EXPRESSION\"");
+            var wrapped = "(\n" + rExpression.get() + "\n)";
+            env.put("AQ_EXPRESSION_B64", Base64.getEncoder().encodeToString(wrapped.getBytes(StandardCharsets.UTF_8)));
+            command.add("\"$(printf '%s' \"$AQ_EXPRESSION_B64\" | base64 -d)\"");
         }
 
         // the command runs in the task working directory, where the input file is created
@@ -248,6 +256,10 @@ public class Query extends Task implements RunnableTask<Query.Output> {
             .uri(runContext.storage().putFile(ionFile.toFile()))
             .processedItemsTotal(processedItemsTotal)
             .build();
+    }
+
+    private static boolean containsTemplate(String value) {
+        return value.contains("{{") || value.contains("{%") || value.contains("{#");
     }
 
     private static InputFormat inputFormat(String from, InputFormat inputFormat) {

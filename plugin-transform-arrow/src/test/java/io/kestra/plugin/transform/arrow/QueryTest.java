@@ -103,6 +103,24 @@ class QueryTest {
     }
 
     @Test
+    void shouldNotRenderTheRenderedExpressionAgain() throws Exception {
+        var literal = "{{ 1 + 1 }}";
+        var runContext = TestsUtils.mockRunContext(
+            runContextFactory,
+            Query.builder().id("query").type(Query.class.getName()).from(Property.ofValue("kestra:///orders.csv")).build(),
+            Map.of("payload", "select(.id == 1) | {text: \"" + literal + "\"}")
+        );
+        var task = Query.builder()
+            .from(Property.ofValue(upload(runContext, "orders.csv", ".csv").toString()))
+            .expression(Property.ofExpression("{{ inputs.payload }}"))
+            .build();
+
+        var output = task.run(runContext);
+
+        assertThat(records(runContext, output.getUri()), contains(Map.of("text", literal)));
+    }
+
+    @Test
     void shouldWriteCsv() throws Exception {
         var runContext = runContext();
         var task = Query.builder()
@@ -199,6 +217,20 @@ class QueryTest {
         var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
 
         assertThat(exception.getMessage(), containsString("inputFormat"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"id,name\n1,alice", "/etc/passwd", "kestra:///orders.csv?x={{ 1 + 1 }}"})
+    void shouldFailWhenFromIsNotAnInternalStorageUri(String from) {
+        var runContext = runContext();
+        var task = Query.builder()
+            .from(Property.ofValue(from))
+            .inputFormat(Property.ofValue(Query.InputFormat.CSV))
+            .build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
+
+        assertThat(exception.getMessage(), containsString("internal storage URI"));
     }
 
     @Test
