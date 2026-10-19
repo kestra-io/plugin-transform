@@ -281,6 +281,24 @@ class DefaultExpressionEngineTest {
     }
 
     @Test
+    void comparesNumbersByValueAcrossIonTypes() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+        record.put("status", IonValueUtils.system().newInt(200));
+        record.put("price", IonValueUtils.system().newFloat(9.99));
+        record.put("code", IonValueUtils.system().newString("200"));
+
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("status == 200", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("status != 200", record)), is(false));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("status in (200, 201)", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("price == 9.99", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("6 / 2 == 3", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("1.50 == 1.5", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("code == 200", record)), is(false));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("code in (200)", record)), is(false));
+    }
+
+    @Test
     void supportsInOperator() throws Exception {
         DefaultExpressionEngine engine = new DefaultExpressionEngine();
         IonStruct record = IonValueUtils.system().newEmptyStruct();

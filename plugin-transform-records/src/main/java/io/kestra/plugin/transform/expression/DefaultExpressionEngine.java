@@ -1,5 +1,8 @@
 package io.kestra.plugin.transform.expression;
 
+import com.amazon.ion.IonDecimal;
+import com.amazon.ion.IonFloat;
+import com.amazon.ion.IonInt;
 import com.amazon.ion.IonList;
 import com.amazon.ion.IonString;
 import com.amazon.ion.IonStruct;
@@ -59,6 +62,31 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
     private static BigDecimal normalizedAverage(BigDecimal total, long count) {
         return total.divide(BigDecimal.valueOf(count), AVG_SCALE, RoundingMode.HALF_UP)
             .stripTrailingZeros();
+    }
+
+    private static boolean valuesEqual(IonValue leftValue, IonValue rightValue) {
+        if (IonValueUtils.isNull(leftValue) || IonValueUtils.isNull(rightValue)) {
+            return IonValueUtils.isNull(leftValue) && IonValueUtils.isNull(rightValue);
+        }
+        BigDecimal leftNumber = numericValue(leftValue);
+        BigDecimal rightNumber = numericValue(rightValue);
+        if (leftNumber != null && rightNumber != null) {
+            return leftNumber.compareTo(rightNumber) == 0;
+        }
+        return leftValue.equals(rightValue);
+    }
+
+    private static BigDecimal numericValue(IonValue value) {
+        if (value instanceof IonInt ionInt) {
+            return new BigDecimal(ionInt.bigIntegerValue());
+        }
+        if (value instanceof IonDecimal ionDecimal) {
+            return ionDecimal.bigDecimalValue();
+        }
+        if (value instanceof IonFloat ionFloat && Double.isFinite(ionFloat.doubleValue())) {
+            return BigDecimal.valueOf(ionFloat.doubleValue());
+        }
+        return null;
     }
 
     private static final class LiteralExpr implements Expr {
@@ -242,7 +270,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
             IonValue leftValue = left.eval(context);
             IonValue rightValue = right.eval(context);
             if (operator == TokenType.EQ_EQ || operator == TokenType.NOT_EQ) {
-                boolean equals = equalsValue(leftValue, rightValue);
+                boolean equals = valuesEqual(leftValue, rightValue);
                 return IonValueUtils.system().newBool(operator == TokenType.EQ_EQ ? equals : !equals);
             }
             if (operator == TokenType.GT || operator == TokenType.GTE || operator == TokenType.LT || operator == TokenType.LTE) {
@@ -286,16 +314,6 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
             } catch (CastException e) {
                 throw new ExpressionException(e.getMessage(), e);
             }
-        }
-
-        private boolean equalsValue(IonValue leftValue, IonValue rightValue) {
-            if (IonValueUtils.isNull(leftValue) && IonValueUtils.isNull(rightValue)) {
-                return true;
-            }
-            if (IonValueUtils.isNull(leftValue) || IonValueUtils.isNull(rightValue)) {
-                return false;
-            }
-            return leftValue.equals(rightValue);
         }
 
         private IonValue compare(IonValue leftValue, IonValue rightValue) throws ExpressionException {
@@ -370,22 +388,12 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
 
             for (Expr candidate : candidates) {
                 IonValue candidateValue = candidate.eval(context);
-                if (equalsValue(leftValue, candidateValue)) {
+                if (valuesEqual(leftValue, candidateValue)) {
                     return IonValueUtils.system().newBool(true);
                 }
             }
 
             return IonValueUtils.system().newBool(false);
-        }
-
-        private boolean equalsValue(IonValue leftValue, IonValue rightValue) {
-            if (IonValueUtils.isNull(leftValue) && IonValueUtils.isNull(rightValue)) {
-                return true;
-            }
-            if (IonValueUtils.isNull(leftValue) || IonValueUtils.isNull(rightValue)) {
-                return false;
-            }
-            return leftValue.equals(rightValue);
         }
     }
 
