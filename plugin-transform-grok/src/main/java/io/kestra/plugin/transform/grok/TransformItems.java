@@ -46,21 +46,21 @@ import java.util.Map;
 @Plugin(
     examples = {
         @Example(
-            title = "Read a plain-text log file from internal storage and parse each line with Grok.",
+            title = "Parse each line of a plain-text log file supplied through a FILE input with Grok.",
             full = true,
             code = """
                 id: grok_transform_items
                 namespace: company.team
 
-                tasks:
-                  - id: read_log
-                    type: io.kestra.plugin.core.storage.Read
-                    uri: "kestra://company.team/production/app.log"
+                inputs:
+                  - id: file
+                    type: FILE
 
+                tasks:
                   - id: transform_items
                     type: io.kestra.plugin.transform.grok.TransformItems
                     pattern: "%{TIMESTAMP_ISO8601:logdate} %{LOGLEVEL:loglevel} %{GREEDYDATA:message}"
-                    from: "{{ outputs.read_log.uri }}"
+                    from: "{{ inputs.file }}"
                 """
         )
     }
