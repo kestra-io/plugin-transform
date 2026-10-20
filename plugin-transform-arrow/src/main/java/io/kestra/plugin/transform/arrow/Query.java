@@ -1,5 +1,6 @@
 package io.kestra.plugin.transform.arrow;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -18,6 +19,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.slf4j.Logger;
 import reactor.core.publisher.Flux;
 
 import java.io.*;
@@ -106,12 +108,14 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
     }
 )
 public class Query extends Task implements RunnableTask<Query.Output> {
-    private static final String DEFAULT_IMAGE = "ghcr.io/kestra-io/aq";
+    // bumped together with AQ_REVISION in dockerfiles/aq.Dockerfile
+    static final String DEFAULT_IMAGE = "ghcr.io/kestra-io/aq:38a8d1f";
     private static final ObjectMapper MAPPER = JacksonMapper.ofJson();
 
     @Schema(
         title = "The file to query",
-        description = "Must be a `kestra://` internal storage URI."
+        description = """
+            Must be a `kestra://` internal storage URI."""
     )
     @NotNull
     @PluginProperty(internalStorageURI = true, group = "main")
@@ -119,14 +123,16 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
     @Schema(
         title = "The jq expression to apply",
-        description = "Applied to each row, or to the array of all rows when `slurp` is true. Defaults to passing each row through."
+        description = """
+            Applied to each row, or to the array of all rows when `slurp` is true. Defaults to passing each row through."""
     )
     @PluginProperty(group = "main")
     private Property<String> expression;
 
     @Schema(
         title = "The format of the output file",
-        description = "`ION` writes each result as a record, like the other transform tasks. The other formats write the file produced by aq."
+        description = """
+            `ION` writes each result as a record, like the other transform tasks. The other formats write the file produced by aq."""
     )
     @NotNull
     @Builder.Default
@@ -135,7 +141,8 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
     @Schema(
         title = "The format of the input file",
-        description = "`AUTO` detects it from the file extension: `.parquet`, `.arrow`, `.ipc`, `.feather`, `.csv`, `.json`, `.jsonl` or `.ndjson`."
+        description = """
+            `AUTO` detects it from the file extension: `.parquet`, `.arrow`, `.ipc`, `.feather`, `.csv`, `.json`, `.jsonl` or `.ndjson`."""
     )
     @NotNull
     @Builder.Default
@@ -144,7 +151,8 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
     @Schema(
         title = "Whether to collect all the rows into an array before applying the expression",
-        description = "Enables aggregations such as `length` or `map(.amount) | add`. All the rows are loaded in memory."
+        description = """
+            Enables aggregations such as `length` or `map(.amount) | add`. All the rows are loaded in memory."""
     )
     @NotNull
     @Builder.Default
@@ -153,14 +161,16 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
     @Schema(
         title = "The field delimiter of CSV input and output",
-        description = "A single character. Defaults to `,`."
+        description = """
+            A single character. Defaults to `,`."""
     )
     @PluginProperty(group = "advanced")
     private Property<String> delimiter;
 
     @Schema(
         title = "The task runner to use",
-        description = "Task runners are provided by plugins, each have their own properties."
+        description = """
+            Task runners are provided by plugins, each have their own properties."""
     )
     @Builder.Default
     @PluginProperty(group = "execution")
@@ -169,14 +179,23 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
     @Schema(
         title = "The task runner container image, only used if the task runner is container-based",
-        description = "The image must provide the `aq` CLI."
+        description = """
+            The image must provide the `aq` CLI."""
     )
     @Builder.Default
     @PluginProperty(group = "execution")
     private Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
 
+    @JsonIgnore
+    @Getter(AccessLevel.NONE)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private transient volatile Logger runLogger;
+
     @Override
     public Output run(RunContext runContext) throws Exception {
+        this.runLogger = runContext.logger();
+
         var rFrom = runContext.render(this.from).as(String.class)
             .filter(value -> !value.isBlank())
             .orElseThrow(() -> new IllegalArgumentException("`from` must be a Kestra internal storage URI"));
@@ -186,8 +205,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
         }
         var rInputFormat = inputFormat(rFrom, runContext.render(this.inputFormat).as(InputFormat.class).orElse(InputFormat.AUTO));
         var rOutputFormat = runContext.render(this.outputFormat).as(OutputFormat.class).orElse(OutputFormat.ION);
-        var rContainerImage = runContext.render(this.containerImage).as(String.class)
-            .orElseThrow(() -> new IllegalArgumentException("`containerImage` must be set"));
+        var rContainerImage = runContext.render(this.containerImage).as(String.class).orElse(DEFAULT_IMAGE);
 
         var inputFile = "input." + rInputFormat.extension;
         var resultFile = "result." + rOutputFormat.extension;
@@ -244,18 +262,32 @@ public class Query extends Task implements RunnableTask<Query.Output> {
         Long processedItemsTotal;
         try (
             var reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(resultUri), StandardCharsets.UTF_8), FileSerde.BUFFER_SIZE);
-            Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(ionFile)), FileSerde.BUFFER_SIZE)
+            var writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(ionFile)), FileSerde.BUFFER_SIZE)
         ) {
             var values = Flux.fromStream(reader.lines())
                 .filter(line -> !line.isBlank())
                 .map(throwFunction(line -> MAPPER.readValue(line, Object.class)));
             processedItemsTotal = FileSerde.writeAll(writer, values).block();
         }
+        runContext.storage().deleteFile(resultUri);
 
         return Output.builder()
             .uri(runContext.storage().putFile(ionFile.toFile()))
             .processedItemsTotal(processedItemsTotal)
             .build();
+    }
+
+    @Override
+    public void kill() {
+        try {
+            if (this.taskRunner != null) {
+                this.taskRunner.kill();
+            }
+        } catch (Exception e) {
+            if (this.runLogger != null) {
+                this.runLogger.warn("Unable to kill the aq container: {}", e.getMessage());
+            }
+        }
     }
 
     private static boolean containsTemplate(String value) {

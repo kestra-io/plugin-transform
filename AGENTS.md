@@ -40,6 +40,7 @@ This is a **multi-module** plugin with 4 submodules:
 - `io.kestra.plugin.transform.Select`
 - `io.kestra.plugin.transform.Unnest`
 - `io.kestra.plugin.transform.Zip`
+
 **plugin-transform-arrow:**
 
 - `io.kestra.plugin.transform.arrow.Query`

@@ -18,9 +18,12 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
@@ -234,6 +237,42 @@ class QueryTest {
     }
 
     @Test
+    void shouldKillTheRunningContainer() throws Exception {
+        var runContext = runContext();
+        var task = Query.builder()
+            .from(Property.ofValue(upload(runContext, "orders.csv", ".csv").toString()))
+            .expression(Property.ofValue("last(range(1e12))"))
+            .build();
+        var error = new AtomicReference<Throwable>();
+
+        var thread = new Thread(() -> {
+            try {
+                task.run(runContext);
+            } catch (Throwable e) {
+                error.set(e);
+            }
+        });
+        thread.start();
+        Thread.sleep(5000);
+        task.kill();
+        thread.join(30_000);
+
+        assertThat(thread.isAlive(), is(false));
+        assertThat(error.get(), notNullValue());
+    }
+
+    @Test
+    void shouldUseTheImageOfTheDockerfile() throws Exception {
+        var revision = Files.readAllLines(Path.of("../dockerfiles/aq.Dockerfile")).stream()
+            .filter(line -> line.startsWith("ARG AQ_REVISION="))
+            .map(line -> line.substring("ARG AQ_REVISION=".length(), "ARG AQ_REVISION=".length() + 7))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(Query.DEFAULT_IMAGE, is("ghcr.io/kestra-io/aq:" + revision));
+    }
+
+    @Test
     void shouldFailOnAnInvalidDelimiter() throws Exception {
         var runContext = runContext();
         var task = Query.builder()
@@ -253,7 +292,7 @@ class QueryTest {
     private static URI upload(RunContext runContext, String fixture, String extension) throws Exception {
         var file = runContext.workingDir().createTempFile(extension);
         try (InputStream in = Objects.requireNonNull(QueryTest.class.getClassLoader().getResourceAsStream("data/" + fixture))) {
-            Files.copy(in, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(in, file, StandardCopyOption.REPLACE_EXISTING);
         }
         return runContext.storage().putFile(file.toFile());
     }
