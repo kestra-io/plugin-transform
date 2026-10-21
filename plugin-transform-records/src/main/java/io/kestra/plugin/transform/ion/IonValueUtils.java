@@ -113,7 +113,7 @@ public final class IonValueUtils {
         return SYSTEM.newString(String.valueOf(value));
     }
 
-    public static BigDecimal asDecimal(IonValue value) throws CastException {
+    public static BigDecimal asNumber(IonValue value) {
         if (isNull(value)) {
             return null;
         }
@@ -121,10 +121,24 @@ public final class IonValueUtils {
             return ionDecimal.bigDecimalValue();
         }
         if (value instanceof IonInt ionInt) {
-            return BigDecimal.valueOf(ionInt.longValue());
+            return new BigDecimal(ionInt.bigIntegerValue());
+        }
+        if (value instanceof IonFloat ionFloat && Double.isFinite(ionFloat.doubleValue())) {
+            return BigDecimal.valueOf(ionFloat.doubleValue());
+        }
+        return null;
+    }
+
+    public static BigDecimal asDecimal(IonValue value) throws CastException {
+        if (isNull(value)) {
+            return null;
+        }
+        BigDecimal number = asNumber(value);
+        if (number != null) {
+            return number;
         }
         if (value instanceof IonFloat ionFloat) {
-            return BigDecimal.valueOf(ionFloat.doubleValue());
+            throw new CastException("Expected finite number, got " + ionFloat.doubleValue());
         }
         if (value instanceof IonString ionString) {
             try {

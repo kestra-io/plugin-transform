@@ -1,8 +1,5 @@
 package io.kestra.plugin.transform.expression;
 
-import com.amazon.ion.IonDecimal;
-import com.amazon.ion.IonFloat;
-import com.amazon.ion.IonInt;
 import com.amazon.ion.IonList;
 import com.amazon.ion.IonString;
 import com.amazon.ion.IonStruct;
@@ -68,25 +65,12 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
         if (IonValueUtils.isNull(leftValue) || IonValueUtils.isNull(rightValue)) {
             return IonValueUtils.isNull(leftValue) && IonValueUtils.isNull(rightValue);
         }
-        BigDecimal leftNumber = numericValue(leftValue);
-        BigDecimal rightNumber = numericValue(rightValue);
+        BigDecimal leftNumber = IonValueUtils.asNumber(leftValue);
+        BigDecimal rightNumber = IonValueUtils.asNumber(rightValue);
         if (leftNumber != null && rightNumber != null) {
             return leftNumber.compareTo(rightNumber) == 0;
         }
         return leftValue.equals(rightValue);
-    }
-
-    private static BigDecimal numericValue(IonValue value) {
-        if (value instanceof IonInt ionInt) {
-            return new BigDecimal(ionInt.bigIntegerValue());
-        }
-        if (value instanceof IonDecimal ionDecimal) {
-            return ionDecimal.bigDecimalValue();
-        }
-        if (value instanceof IonFloat ionFloat && Double.isFinite(ionFloat.doubleValue())) {
-            return BigDecimal.valueOf(ionFloat.doubleValue());
-        }
-        return null;
     }
 
     private static final class LiteralExpr implements Expr {

@@ -104,6 +104,8 @@ public class Filter extends Task implements RunnableTask<Filter.Output> {
         title = "Filter expression",
         description = """
         Expression evaluated on each record and required to return true or false.
+        `==`, `!=` and `in` compare numbers by value but never match a string to a number, so `"200" == 200` is false.
+        `>`, `>=`, `<` and `<=` parse a numeric string compared with a number, so `"200" > 199` is true, but compare two strings as text.
         """
     )
     @PluginProperty(group = "main")
