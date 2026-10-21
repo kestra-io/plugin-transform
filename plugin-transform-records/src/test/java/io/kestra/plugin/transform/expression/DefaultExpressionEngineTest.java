@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
@@ -296,6 +297,31 @@ class DefaultExpressionEngineTest {
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("1.50 == 1.5", record)), is(true));
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("code == 200", record)), is(false));
         assertThat(IonValueUtils.toJavaValue(engine.evaluate("code in (200)", record)), is(false));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("code != 200", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("status in (200.0, null)", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("status in (null)", record)), is(false));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("1E+2 == 100", record)), is(true));
+    }
+
+    @Test
+    void treatsTypedNullsAsNull() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+        record.put("status", IonValueUtils.system().newNullInt());
+
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("status == null", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("status != 200", record)), is(true));
+    }
+
+    @Test
+    void comparesIntegersBeyondLongRange() throws Exception {
+        DefaultExpressionEngine engine = new DefaultExpressionEngine();
+        IonStruct record = IonValueUtils.system().newEmptyStruct();
+        record.put("big", IonValueUtils.system().newInt(new BigInteger("9223372036854775808")));
+
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("big == 9223372036854775808", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("big > 9223372036854775807", record)), is(true));
+        assertThat(IonValueUtils.toJavaValue(engine.evaluate("big + 1 == 9223372036854775809", record)), is(true));
     }
 
     @Test

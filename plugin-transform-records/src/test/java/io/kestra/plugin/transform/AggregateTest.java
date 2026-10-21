@@ -174,6 +174,27 @@ class AggregateTest {
         assertThat(row.get("total_spent"), is(new BigDecimal("18.00")));
     }
 
+    @Test
+    void skipOnErrorDropsNaNRecord() throws Exception {
+        java.util.Map<String, Object> good = java.util.Map.of("customer_id", "c1", "total_spent", new BigDecimal("10.00"));
+        java.util.Map<String, Object> nan = java.util.Map.of("customer_id", "c1", "total_spent", Double.NaN);
+
+        Aggregate task = Aggregate.builder()
+            .from(Property.ofValue(List.of(good, nan)))
+            .groupBy(Property.ofValue(List.of("customer_id")))
+            .aggregates(Property.ofValue(java.util.Map.of(
+                "total_spent", Aggregate.AggregateDefinition.builder().expr("sum(total_spent)").type(IonTypeName.DECIMAL).build()
+            )))
+            .onError(Property.ofValue(TransformOptions.OnErrorMode.SKIP))
+            .build();
+
+        Aggregate.Output output = task.run(runContextFactory.of(java.util.Map.of()));
+
+        assertThat(output.getRecords(), hasSize(1));
+        java.util.Map<String, Object> row = (java.util.Map<String, Object>) output.getRecords().getFirst();
+        assertThat(row.get("total_spent"), is(new BigDecimal("10.00")));
+    }
+
     @SuppressWarnings("unchecked")
     @Test
     void groupsByNestedFieldPath() throws Exception {
