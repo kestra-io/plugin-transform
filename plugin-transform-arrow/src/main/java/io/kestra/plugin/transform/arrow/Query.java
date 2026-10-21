@@ -12,6 +12,7 @@ import io.kestra.core.models.tasks.runners.TaskRunner;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
 import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.core.utils.PebbleUtil;
 import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
 import io.kestra.plugin.scripts.runner.docker.Docker;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -200,7 +201,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
             .filter(value -> !value.isBlank())
             .orElseThrow(() -> new IllegalArgumentException("`from` must be a Kestra internal storage URI"));
         // the task runner renders the input files again, so only an internal storage URI is accepted
-        if (!rFrom.startsWith("kestra://") || containsTemplate(rFrom)) {
+        if (!rFrom.startsWith("kestra://") || PebbleUtil.containsOpeningBlockDelimiter(rFrom)) {
             throw new IllegalArgumentException("`from` must be a Kestra internal storage URI, got '" + rFrom + "'");
         }
         var rInputFormat = inputFormat(rFrom, runContext.render(this.inputFormat).as(InputFormat.class).orElse(InputFormat.AUTO));
@@ -229,9 +230,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
         var rExpression = runContext.render(this.expression).as(String.class);
         if (rExpression.isPresent()) {
-            // the task runner renders the environment values again, so a rendered expression containing a Pebble tag
-            // would be evaluated a second time: pass it Base64 encoded and decode it in the shell
-            // aq reads its first argument as a file when it is an existing path, such as `.`
+            // Base64 so the task runner does not render it again, parentheses so aq never reads it as a path
             var wrapped = "(\n" + rExpression.get() + "\n)";
             env.put("AQ_EXPRESSION_B64", Base64.getEncoder().encodeToString(wrapped.getBytes(StandardCharsets.UTF_8)));
             command.add("\"$(printf '%s' \"$AQ_EXPRESSION_B64\" | base64 -d)\"");
@@ -288,10 +287,6 @@ public class Query extends Task implements RunnableTask<Query.Output> {
                 this.runLogger.warn("Unable to kill the aq container: {}", e.getMessage());
             }
         }
-    }
-
-    private static boolean containsTemplate(String value) {
-        return value.contains("{{") || value.contains("{%") || value.contains("{#");
     }
 
     private static InputFormat inputFormat(String from, InputFormat inputFormat) {
@@ -355,7 +350,8 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
         @Schema(
             title = "The total number of records written",
-            description = "Only set when `outputFormat` is `ION`."
+            description = """
+                Only set when `outputFormat` is `ION`."""
         )
         private final Long processedItemsTotal;
     }

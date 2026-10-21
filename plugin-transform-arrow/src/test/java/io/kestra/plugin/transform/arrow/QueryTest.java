@@ -7,6 +7,8 @@ import io.kestra.core.models.tasks.RunnableTaskException;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
+import io.kestra.core.utils.Await;
+import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -110,7 +113,7 @@ class QueryTest {
         var literal = "{{ 1 + 1 }}";
         var runContext = TestsUtils.mockRunContext(
             runContextFactory,
-            Query.builder().id("query").type(Query.class.getName()).from(Property.ofValue("kestra:///orders.csv")).build(),
+            Query.builder().id(IdUtils.create()).type(Query.class.getName()).from(Property.ofValue("kestra:///orders.csv")).build(),
             Map.of("payload", "select(.id == 1) | {text: \"" + literal + "\"}")
         );
         var task = Query.builder()
@@ -253,9 +256,11 @@ class QueryTest {
             }
         });
         thread.start();
-        Thread.sleep(5000);
-        task.kill();
-        thread.join(30_000);
+        // the container may not be started yet, so retry the kill until the run ends
+        Await.until(() -> {
+            task.kill();
+            return !thread.isAlive();
+        }, Duration.ofMillis(500), Duration.ofSeconds(60));
 
         assertThat(thread.isAlive(), is(false));
         assertThat(error.get(), notNullValue());
@@ -286,7 +291,7 @@ class QueryTest {
     }
 
     private RunContext runContext() {
-        return TestsUtils.mockRunContext(runContextFactory, Query.builder().id("query").type(Query.class.getName()).from(Property.ofValue("kestra:///orders.csv")).build(), Map.of());
+        return TestsUtils.mockRunContext(runContextFactory, Query.builder().id(IdUtils.create()).type(Query.class.getName()).from(Property.ofValue("kestra:///orders.csv")).build(), Map.of());
     }
 
     private static URI upload(RunContext runContext, String fixture, String extension) throws Exception {
