@@ -508,7 +508,9 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
         for (String field : groupByFields) {
             try {
                 var value = expressionEngine.evaluate(field, record);
-                key.add(IonValueUtils.toJavaValue(value));
+                BigDecimal number = IonValueUtils.asNumber(value);
+                // Canonical BigDecimal so 200, 200.0 and 200.00 share one group.
+                key.add(number != null ? number.stripTrailingZeros() : IonValueUtils.toJavaValue(value));
             } catch (ExpressionException e) {
                 throw new TransformException("Failed to resolve groupBy field '" + field + "': " + e.getMessage(), e);
             }
