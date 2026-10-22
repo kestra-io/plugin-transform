@@ -1,0 +1,3 @@
+{"id": 1, "name": "alice", "amount": 120.5, "status": "paid"}
+{"id": 2, "name": "bob", "amount": 30.0, "status": "pending"}
+{"id": 3, "name": "carol", "amount": 75.25, "status": "paid"}

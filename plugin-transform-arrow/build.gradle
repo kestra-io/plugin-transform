@@ -1,0 +1,13 @@
+project.description = 'Kestra Plugin Transformation for Arrow.'
+
+jar {
+    manifest {
+        attributes(
+                "X-Kestra-Name": project.name,
+                "X-Kestra-Title": "Arrow",
+                "X-Kestra-Group": project.group + ".transform.arrow",
+                "X-Kestra-Description": project.description,
+                "X-Kestra-Version": project.version
+        )
+    }
+}
