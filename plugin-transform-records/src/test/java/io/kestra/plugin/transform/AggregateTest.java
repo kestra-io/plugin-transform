@@ -282,4 +282,30 @@ class AggregateTest {
         var row = (java.util.Map<String, Object>) output.getRecords().getFirst();
         assertThat(row.get("avg_duration"), is(new BigDecimal("1.3333333333")));
     }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void groupsEqualNumbersTogetherAcrossNumericTypes() throws Exception {
+        var records = List.of(
+            java.util.Map.<String, Object>of("code", 200),
+            java.util.Map.<String, Object>of("code", 200.0d),
+            java.util.Map.<String, Object>of("code", new BigDecimal("200.00")),
+            java.util.Map.<String, Object>of("code", "200")
+        );
+
+        var task = Aggregate.builder()
+            .from(Property.ofValue(records))
+            .groupBy(Property.ofValue(List.of("code")))
+            .aggregates(Property.ofValue(java.util.Map.of(
+                "n", Aggregate.AggregateDefinition.builder().expr("count()").type(IonTypeName.INT).build()
+            )))
+            .build();
+
+        var output = task.run(runContextFactory.of(java.util.Map.of()));
+
+        var counts = output.getRecords().stream()
+            .map(r -> (java.util.Map<String, Object>) r)
+            .collect(java.util.stream.Collectors.toMap(r -> r.get("code"), r -> ((Number) r.get("n")).longValue()));
+        assertThat(counts, is(java.util.Map.of(200L, 3L, "200", 1L)));
+    }
 }
