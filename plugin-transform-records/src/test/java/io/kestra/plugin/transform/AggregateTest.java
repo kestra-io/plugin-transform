@@ -174,6 +174,27 @@ class AggregateTest {
         assertThat(row.get("total_spent"), is(new BigDecimal("18.00")));
     }
 
+    @Test
+    void skipOnErrorDropsNaNRecord() throws Exception {
+        java.util.Map<String, Object> good = java.util.Map.of("customer_id", "c1", "total_spent", new BigDecimal("10.00"));
+        java.util.Map<String, Object> nan = java.util.Map.of("customer_id", "c1", "total_spent", Double.NaN);
+
+        Aggregate task = Aggregate.builder()
+            .from(Property.ofValue(List.of(good, nan)))
+            .groupBy(Property.ofValue(List.of("customer_id")))
+            .aggregates(Property.ofValue(java.util.Map.of(
+                "total_spent", Aggregate.AggregateDefinition.builder().expr("sum(total_spent)").type(IonTypeName.DECIMAL).build()
+            )))
+            .onError(Property.ofValue(TransformOptions.OnErrorMode.SKIP))
+            .build();
+
+        Aggregate.Output output = task.run(runContextFactory.of(java.util.Map.of()));
+
+        assertThat(output.getRecords(), hasSize(1));
+        java.util.Map<String, Object> row = (java.util.Map<String, Object>) output.getRecords().getFirst();
+        assertThat(row.get("total_spent"), is(new BigDecimal("10.00")));
+    }
+
     @SuppressWarnings("unchecked")
     @Test
     void groupsByNestedFieldPath() throws Exception {
@@ -260,5 +281,34 @@ class AggregateTest {
         assertThat(output.getRecords(), hasSize(1));
         var row = (java.util.Map<String, Object>) output.getRecords().getFirst();
         assertThat(row.get("avg_duration"), is(new BigDecimal("1.3333333333")));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void groupsEqualNumbersTogetherAcrossNumericTypes() throws Exception {
+        var records = List.of(
+            java.util.Map.<String, Object>of("code", 200),
+            java.util.Map.<String, Object>of("code", 200.0d),
+            java.util.Map.<String, Object>of("code", new BigDecimal("200.00")),
+            java.util.Map.<String, Object>of("code", "200")
+        );
+
+        var task = Aggregate.builder()
+            .from(Property.ofValue(records))
+            .groupBy(Property.ofValue(List.of("code")))
+            .aggregates(Property.ofValue(java.util.Map.of(
+                "n", Aggregate.AggregateDefinition.builder().expr("count()").type(IonTypeName.INT).build()
+            )))
+            .build();
+
+        var output = task.run(runContextFactory.of(java.util.Map.of()));
+
+        // numeric 200 variants merge, the string "200" stays separate
+        assertThat(output.getRecords(), hasSize(2));
+        var counts = output.getRecords().stream()
+            .map(r -> ((Number) ((java.util.Map<String, Object>) r).get("n")).longValue())
+            .sorted()
+            .toList();
+        assertThat(counts, is(List.of(1L, 3L)));
     }
 }

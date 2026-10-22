@@ -40,6 +40,22 @@ class FilterTest {
     }
 
     @Test
+    void filtersIntegerFieldWithEquality() throws Exception {
+        java.util.Map<String, Object> ok = java.util.Map.of("id", "a", "status", 200);
+        java.util.Map<String, Object> notFound = java.util.Map.of("id", "b", "status", 404);
+
+        Filter task = Filter.builder()
+            .from(Property.ofValue(List.of(ok, notFound)))
+            .where(Property.ofValue("status == 200"))
+            .build();
+
+        Filter.Output output = task.run(runContextFactory.of(java.util.Map.of()));
+
+        assertThat(output.getRecords(), hasSize(1));
+        assertThat(((java.util.Map<String, Object>) output.getRecords().getFirst()).get("id"), is("a"));
+    }
+
+    @Test
     void keepOnErrorPreservesRecord() throws Exception {
         java.util.Map<String, Object> record = java.util.Map.of("total", new BigDecimal("10"));
 
