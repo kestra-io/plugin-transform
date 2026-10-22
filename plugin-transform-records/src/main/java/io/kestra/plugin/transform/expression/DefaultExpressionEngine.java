@@ -61,6 +61,18 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
             .stripTrailingZeros();
     }
 
+    private static boolean valuesEqual(IonValue leftValue, IonValue rightValue) {
+        if (IonValueUtils.isNull(leftValue) || IonValueUtils.isNull(rightValue)) {
+            return IonValueUtils.isNull(leftValue) && IonValueUtils.isNull(rightValue);
+        }
+        BigDecimal leftNumber = IonValueUtils.asNumber(leftValue);
+        BigDecimal rightNumber = IonValueUtils.asNumber(rightValue);
+        if (leftNumber != null && rightNumber != null) {
+            return leftNumber.compareTo(rightNumber) == 0;
+        }
+        return leftValue.equals(rightValue);
+    }
+
     private static final class LiteralExpr implements Expr {
         private final IonValue value;
 
@@ -242,7 +254,7 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
             IonValue leftValue = left.eval(context);
             IonValue rightValue = right.eval(context);
             if (operator == TokenType.EQ_EQ || operator == TokenType.NOT_EQ) {
-                boolean equals = equalsValue(leftValue, rightValue);
+                boolean equals = valuesEqual(leftValue, rightValue);
                 return IonValueUtils.system().newBool(operator == TokenType.EQ_EQ ? equals : !equals);
             }
             if (operator == TokenType.GT || operator == TokenType.GTE || operator == TokenType.LT || operator == TokenType.LTE) {
@@ -286,16 +298,6 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
             } catch (CastException e) {
                 throw new ExpressionException(e.getMessage(), e);
             }
-        }
-
-        private boolean equalsValue(IonValue leftValue, IonValue rightValue) {
-            if (IonValueUtils.isNull(leftValue) && IonValueUtils.isNull(rightValue)) {
-                return true;
-            }
-            if (IonValueUtils.isNull(leftValue) || IonValueUtils.isNull(rightValue)) {
-                return false;
-            }
-            return leftValue.equals(rightValue);
         }
 
         private IonValue compare(IonValue leftValue, IonValue rightValue) throws ExpressionException {
@@ -370,22 +372,12 @@ public final class DefaultExpressionEngine implements ExpressionEngine {
 
             for (Expr candidate : candidates) {
                 IonValue candidateValue = candidate.eval(context);
-                if (equalsValue(leftValue, candidateValue)) {
+                if (valuesEqual(leftValue, candidateValue)) {
                     return IonValueUtils.system().newBool(true);
                 }
             }
 
             return IonValueUtils.system().newBool(false);
-        }
-
-        private boolean equalsValue(IonValue leftValue, IonValue rightValue) {
-            if (IonValueUtils.isNull(leftValue) && IonValueUtils.isNull(rightValue)) {
-                return true;
-            }
-            if (IonValueUtils.isNull(leftValue) || IonValueUtils.isNull(rightValue)) {
-                return false;
-            }
-            return leftValue.equals(rightValue);
         }
     }
 
