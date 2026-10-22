@@ -163,6 +163,7 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
         title = "Group by",
         description = """
         Fields to group on.
+        Numeric fields are grouped by value, so `200` and `200.0` share a group and the first record's value is output. A string such as `"200"` is a separate group.
         """
     )
     @PluginProperty(group = "main")
@@ -508,7 +509,9 @@ public class Aggregate extends Task implements RunnableTask<Aggregate.Output> {
         for (String field : groupByFields) {
             try {
                 var value = expressionEngine.evaluate(field, record);
-                key.add(IonValueUtils.toJavaValue(value));
+                BigDecimal number = IonValueUtils.asNumber(value);
+                // BigDecimal.equals is scale-sensitive, so strip zeros to make 200 and 200.00 one key.
+                key.add(number != null ? number.stripTrailingZeros() : IonValueUtils.toJavaValue(value));
             } catch (ExpressionException e) {
                 throw new TransformException("Failed to resolve groupBy field '" + field + "': " + e.getMessage(), e);
             }
