@@ -113,6 +113,7 @@ public final class IonValueUtils {
         return SYSTEM.newString(String.valueOf(value));
     }
 
+    /** Numeric value of an Ion int, decimal or finite float, else null. Unlike {@link #asDecimal(IonValue)}, never parses strings. */
     public static BigDecimal asNumber(IonValue value) {
         if (isNull(value)) {
             return null;
