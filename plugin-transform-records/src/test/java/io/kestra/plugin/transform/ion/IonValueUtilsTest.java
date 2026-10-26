@@ -1,18 +1,23 @@
 package io.kestra.plugin.transform.ion;
 
+import com.amazon.ion.IonInt;
 import com.amazon.ion.IonList;
 import com.amazon.ion.IonStruct;
 import com.amazon.ion.IonTimestamp;
 import com.amazon.ion.IonValue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 
@@ -54,6 +59,35 @@ class IonValueUtilsTest {
         assertThat(result.get("name"), is("beta"));
         assertThat(result.get("count"), is(42L));
         assertThat(result.get("when"), is("2024-01-01T00:00:00Z"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {Long.MAX_VALUE, Long.MIN_VALUE})
+    void convertsIntegersWithinLongRange(long value) {
+        Object result = IonValueUtils.toJavaValue(IonValueUtils.system().newInt(value));
+
+        assertThat(result, is(value));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"9223372036854775808", "-9223372036854775809"})
+    void convertsIntegersOutsideLongRange(String value) {
+        BigInteger expected = new BigInteger(value);
+
+        Object result = IonValueUtils.toJavaValue(IonValueUtils.system().newInt(expected));
+
+        assertThat(result, is(expected));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"9223372036854775808", "-9223372036854775809"})
+    void roundTripsBigIntegers(String value) {
+        BigInteger expected = new BigInteger(value);
+
+        IonValue ionValue = IonValueUtils.toIonValue(expected);
+
+        assertThat(ionValue, is(instanceOf(IonInt.class)));
+        assertThat(IonValueUtils.toJavaValue(ionValue), is(expected));
     }
 
     @Test
