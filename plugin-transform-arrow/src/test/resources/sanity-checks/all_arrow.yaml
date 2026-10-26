@@ -1,0 +1,35 @@
+id: all_arrow
+namespace: sanitychecks.plugin-transform-arrow
+
+tasks:
+  - id: write_orders
+    type: io.kestra.plugin.core.storage.Write
+    content: |
+      id,name,amount,status
+      1,alice,120.5,paid
+      2,bob,30.0,pending
+      3,carol,75.25,paid
+    extension: .csv
+
+  - id: paid_orders
+    type: io.kestra.plugin.transform.arrow.Query
+    from: "{{ outputs.write_orders.uri }}"
+    expression: 'select(.status == "paid") | {name, amount}'
+
+  - id: revenue
+    type: io.kestra.plugin.transform.arrow.Query
+    from: "{{ outputs.write_orders.uri }}"
+    slurp: true
+    expression: 'map(.amount) | add'
+    outputFormat: JSON
+
+  - id: assert
+    type: io.kestra.plugin.core.execution.Assert
+    conditions:
+      - "{{ outputs.paid_orders.processedItemsTotal == 2 }}"
+      - "{{ fromIon(read(outputs.paid_orders.uri), allRows=true)[1].name == 'carol' }}"
+      - "{{ read(outputs.revenue.uri) | trim == '[225.75]' }}"
+
+finally:
+  - id: purge
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles

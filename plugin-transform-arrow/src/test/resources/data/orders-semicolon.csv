@@ -1,0 +1,4 @@
+id;name;amount;status
+1;alice;120.5;paid
+2;bob;30.0;pending
+3;carol;75.25;paid
