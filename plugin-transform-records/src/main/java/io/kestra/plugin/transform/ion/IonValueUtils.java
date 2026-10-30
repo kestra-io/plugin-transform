@@ -1,5 +1,6 @@
 package io.kestra.plugin.transform.ion;
 
+import com.amazon.ion.IntegerSize;
 import com.amazon.ion.IonBool;
 import com.amazon.ion.IonDecimal;
 import com.amazon.ion.IonFloat;
@@ -14,6 +15,7 @@ import com.amazon.ion.Timestamp;
 import com.amazon.ion.system.IonSystemBuilder;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
@@ -71,6 +73,9 @@ public final class IonValueUtils {
         }
         if (value instanceof Integer || value instanceof Long || value instanceof Short || value instanceof Byte) {
             return SYSTEM.newInt(((Number) value).longValue());
+        }
+        if (value instanceof BigInteger integer) {
+            return SYSTEM.newInt(integer);
         }
         if (value instanceof Float || value instanceof Double) {
             return SYSTEM.newFloat(((Number) value).doubleValue());
@@ -219,6 +224,9 @@ public final class IonValueUtils {
             return ionString.stringValue();
         }
         if (value instanceof IonInt ionInt) {
+            if (IntegerSize.BIG_INTEGER == ionInt.getIntegerSize()) {
+                return ionInt.bigIntegerValue();
+            }
             return ionInt.longValue();
         }
         if (value instanceof IonFloat ionFloat) {

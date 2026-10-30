@@ -4,12 +4,19 @@ import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.tenant.TenantService;
 import io.kestra.plugin.transform.util.TransformException;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.UUID;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -19,6 +26,9 @@ import static org.hamcrest.Matchers.is;
 class FilterTest {
     @Inject
     private RunContextFactory runContextFactory;
+
+    @Inject
+    private StorageInterface storageInterface;
 
     @Test
     void filtersRecords() throws Exception {
@@ -37,6 +47,27 @@ class FilterTest {
         java.util.Map<String, Object> record = (java.util.Map<String, Object>) output.getRecords().getFirst();
         assertThat(record.get("active"), is(true));
         assertThat(output.getRecords(), hasSize(1));
+    }
+
+    @Test
+    void preservesLargeIntegersInRecordsOutput() throws Exception {
+        String ion = "{id:9223372036854775808,active:true}";
+        URI source = storageInterface.put(TenantService.MAIN_TENANT, null,
+            URI.create("/" + UUID.randomUUID() + ".ion"),
+            new ByteArrayInputStream(ion.getBytes(StandardCharsets.UTF_8)));
+
+        Filter task = Filter.builder()
+            .from(Property.ofValue((Object) source.toString()))
+            .where(Property.ofValue("active"))
+            .outputType(Property.ofValue(Filter.OutputMode.RECORDS))
+            .build();
+
+        Filter.Output output = task.run(runContextFactory.of(java.util.Map.of()));
+
+        assertThat(output.getRecords(), hasSize(1));
+        java.util.Map<String, Object> record = (java.util.Map<String, Object>) output.getRecords().getFirst();
+        assertThat(record.get("id"), is(new BigInteger("9223372036854775808")));
+        assertThat(record.get("active"), is(true));
     }
 
     @Test
