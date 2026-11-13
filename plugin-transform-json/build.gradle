@@ -21,5 +21,4 @@ jar {
 
 dependencies {
     implementation 'com.dashjoin:jsonata:0.9.10'
-    testImplementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-ion'
 }
