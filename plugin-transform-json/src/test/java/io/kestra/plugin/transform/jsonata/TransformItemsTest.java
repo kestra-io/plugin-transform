@@ -14,8 +14,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import reactor.core.publisher.Flux;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.URI;
@@ -26,6 +27,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 @KestraTest
 class TransformItemsTest {
@@ -59,7 +62,7 @@ class TransformItemsTest {
         Assertions.assertEquals(2, output.getProcessedItemsTotal());
 
         InputStream is = runContext.storage().getFile(output.getUri());
-        String transformationResult = FileSerde.readAll(new InputStreamReader(is), new TypeReference<String>() {
+        String transformationResult = FileSerde.readAll(is, new TypeReference<String>() {
         }).blockLast();
 
         Assertions.assertEquals(Features.DATASET_ACCOUNT_ORDER_EXPR_RESULT, transformationResult);
@@ -90,7 +93,7 @@ class TransformItemsTest {
         Assertions.assertEquals(2, output.getProcessedItemsTotal());
 
         InputStream is = runContext.storage().getFile(output.getUri());
-        List<Map> transformationResult = FileSerde.readAll(new InputStreamReader(is), new TypeReference<Map>() {
+        List<Map> transformationResult = FileSerde.readAll(is, new TypeReference<Map>() {
         }).collectList().block();
 
         Assertions.assertEquals(2, transformationResult.size());
@@ -121,7 +124,7 @@ class TransformItemsTest {
         Assertions.assertEquals(1, output.getProcessedItemsTotal());
 
         InputStream is = runContext.storage().getFile(output.getUri());
-        List<List> transformationResult = FileSerde.readAll(new InputStreamReader(is), new TypeReference<List>() {
+        List<List> transformationResult = FileSerde.readAll(is, new TypeReference<List>() {
         }).collectList().block();
 
         Assertions.assertEquals(1, transformationResult.size());
@@ -265,7 +268,7 @@ class TransformItemsTest {
         Assertions.assertEquals(1, output.getProcessedItemsTotal());
 
         InputStream is = runContext.storage().getFile(output.getUri());
-        List<Map> transformationResult = FileSerde.readAll(new InputStreamReader(is), new TypeReference<Map>() {
+        List<Map> transformationResult = FileSerde.readAll(is, new TypeReference<Map>() {
         }).collectList().block();
 
         Assertions.assertEquals(1, transformationResult.size());
@@ -301,7 +304,7 @@ class TransformItemsTest {
         Assertions.assertEquals(1, output.getProcessedItemsTotal());
 
         InputStream is = runContext.storage().getFile(output.getUri());
-        List<String> transformationResult = FileSerde.readAll(new InputStreamReader(is), new TypeReference<String>() {
+        List<String> transformationResult = FileSerde.readAll(is, new TypeReference<String>() {
         }).collectList().block();
 
         Assertions.assertEquals(1, transformationResult.size());
@@ -323,7 +326,7 @@ class TransformItemsTest {
         TransformItems.Output output = task.run(runContext);
 
         Assertions.assertEquals(0, output.getProcessedItemsTotal());
-        Assertions.assertEquals(0, readRaw(runContext, output.getUri()).length());
+        Assertions.assertTrue(readRecords(runContext, output.getUri()).isEmpty());
     }
 
     @Test
@@ -340,7 +343,7 @@ class TransformItemsTest {
         TransformItems.Output output = task.run(runContext);
 
         Assertions.assertEquals(0, output.getProcessedItemsTotal());
-        Assertions.assertEquals(0, readRaw(runContext, output.getUri()).length());
+        Assertions.assertTrue(readRecords(runContext, output.getUri()).isEmpty());
     }
 
     @Test
@@ -365,7 +368,7 @@ class TransformItemsTest {
         Assertions.assertEquals(2, output.getProcessedItemsTotal());
 
         InputStream is = runContext.storage().getFile(output.getUri());
-        List<String> transformationResult = FileSerde.readAll(new InputStreamReader(is), new TypeReference<String>() {
+        List<String> transformationResult = FileSerde.readAll(is, new TypeReference<String>() {
         }).collectList().block();
 
         Assertions.assertEquals(List.of("ThinkPad", "MacBook"), transformationResult);
@@ -389,11 +392,44 @@ class TransformItemsTest {
         Assertions.assertEquals(1, output.getProcessedItemsTotal());
 
         InputStream is = runContext.storage().getFile(output.getUri());
-        List<List> transformationResult = FileSerde.readAll(new InputStreamReader(is), new TypeReference<List>() {
+        List<List> transformationResult = FileSerde.readAll(is, new TypeReference<List>() {
         }).collectList().block();
 
         Assertions.assertEquals(1, transformationResult.size());
         Assertions.assertEquals(Arrays.asList(1, null, 2), transformationResult.getFirst());
+    }
+
+    @Test
+    void shouldTransformBinaryIonInput() throws Exception {
+        assumeTrue(coreWritesBinaryIon(), "FileSerde in this Kestra core version only writes text Ion");
+        RunContext runContext = runContextFactory.of();
+        final Path inputPath = runContext.workingDir().createTempFile(".ion");
+        try (OutputStream os = Files.newOutputStream(inputPath)) {
+            FileSerde.writeAll(os, Flux.just(Map.of("name", "a"), Map.of("name", "b"))).block();
+        }
+        URI uri = runContext.storage().putFile(inputPath.toFile());
+
+        var task = TransformItems.builder()
+            .from(Property.ofValue(uri.toString()))
+            .expression(Property.ofValue("name"))
+            .build();
+
+        TransformItems.Output output = task.run(runContext);
+
+        Assertions.assertEquals(2, output.getProcessedItemsTotal());
+        try (InputStream is = runContext.storage().getFile(output.getUri())) {
+            List<String> result = FileSerde.readAll(is, new TypeReference<String>() {
+            }).collectList().block();
+            Assertions.assertEquals(List.of("a", "b"), result);
+        }
+    }
+
+    private static boolean coreWritesBinaryIon() throws Exception {
+        var out = new ByteArrayOutputStream();
+        FileSerde.writeAll(out, Flux.just(Map.of("a", 1))).block();
+        byte[] bytes = out.toByteArray();
+        return bytes.length >= 4
+            && (bytes[0] & 0xFF) == 0xE0 && bytes[1] == 0x01 && bytes[2] == 0x00 && (bytes[3] & 0xFF) == 0xEA;
     }
 
     @SafeVarargs
@@ -406,9 +442,10 @@ class TransformItemsTest {
         return runContext.storage().putFile(outputFilePath.toFile());
     }
 
-    private String readRaw(RunContext runContext, URI uri) throws Exception {
+    private List<Object> readRecords(RunContext runContext, URI uri) throws Exception {
         try (InputStream is = runContext.storage().getFile(uri)) {
-            return new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            return FileSerde.readAll(is, new TypeReference<Object>() {
+            }).collectList().block();
         }
     }
 }
