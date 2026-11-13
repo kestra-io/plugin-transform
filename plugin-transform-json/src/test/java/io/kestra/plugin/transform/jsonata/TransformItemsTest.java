@@ -16,10 +16,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import reactor.core.publisher.Flux;
 
-import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.URI;
@@ -404,7 +404,7 @@ class TransformItemsTest {
 
     @Test
     void shouldTransformBinaryIonInput() throws Exception {
-        assumeTrue(coreReadsBinaryIon(), "FileSerde in this Kestra core version only reads text Ion");
+        assumeTrue(coreWritesBinaryIon(), "FileSerde in this Kestra core version only writes text Ion");
         RunContext runContext = runContextFactory.of();
         final Path inputPath = runContext.workingDir().createTempFile(".ion");
         try (OutputStream os = Files.newOutputStream(inputPath);
@@ -414,7 +414,7 @@ class TransformItemsTest {
         }
         URI uri = runContext.storage().putFile(inputPath.toFile());
 
-        TransformItems task = TransformItems.builder()
+        var task = TransformItems.builder()
             .from(Property.ofValue(uri.toString()))
             .expression(Property.ofValue("name"))
             .build();
@@ -429,14 +429,12 @@ class TransformItemsTest {
         }
     }
 
-    private static boolean coreReadsBinaryIon() throws Exception {
-        byte[] binary = IonObjectMapper.builderForBinaryWriters().build().writeValueAsBytes(Map.of("a", 1));
-        try (InputStream in = new ByteArrayInputStream(binary)) {
-            FileSerde.readAll(in).collectList().block();
-            return true;
-        } catch (RuntimeException e) {
-            return false;
-        }
+    private static boolean coreWritesBinaryIon() throws Exception {
+        var out = new ByteArrayOutputStream();
+        FileSerde.writeAll(out, Flux.just(Map.of("a", 1))).block();
+        byte[] bytes = out.toByteArray();
+        return bytes.length >= 4
+            && (bytes[0] & 0xFF) == 0xE0 && bytes[1] == 0x01 && bytes[2] == 0x00 && (bytes[3] & 0xFF) == 0xEA;
     }
 
     @SafeVarargs
