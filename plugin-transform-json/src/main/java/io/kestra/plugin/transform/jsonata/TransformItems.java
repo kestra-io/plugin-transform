@@ -123,11 +123,11 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
         try {
             final URI from = new URI(runContext.render(this.from).as(String.class).orElseThrow());
 
-            try (Reader reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(from)), FileSerde.BUFFER_SIZE)) {
-                Flux<JsonNode> flux = FileSerde.readAll(reader, new TypeReference<>() {
+            try (InputStream input = new BufferedInputStream(runContext.storage().getFile(from), FileSerde.BUFFER_SIZE)) {
+                Flux<JsonNode> flux = FileSerde.readAll(input, new TypeReference<>() {
                 });
                 final Path outputFilePath = runContext.workingDir().createTempFile(".ion");
-                try (Writer writer = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(outputFilePath)))) {
+                try (OutputStream output = new BufferedOutputStream(Files.newOutputStream(outputFilePath), FileSerde.BUFFER_SIZE)) {
 
                     // transform - items whose expression matches nothing are skipped rather than
                     // written out as a null record (see #111)
@@ -143,7 +143,7 @@ public class TransformItems extends Transform<TransformItems.Output> implements 
                         });
                     }
 
-                    Long processedItemsTotal = FileSerde.writeAll(writer, values).block();
+                    Long processedItemsTotal = FileSerde.writeAll(output, values).block();
 
                     URI uri = runContext.storage().putFile(outputFilePath.toFile());
 
