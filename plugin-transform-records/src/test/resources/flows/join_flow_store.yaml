@@ -1,0 +1,26 @@
+id: join_flow_store
+namespace: dev.tests
+
+tasks:
+  - id: customers
+    type: io.kestra.plugin.core.storage.Write
+    extension: .ion
+    content: |
+      {customer_id:1,name:"Alice"}
+      {customer_id:2,name:"Bob"}
+
+  - id: orders
+    type: io.kestra.plugin.core.storage.Write
+    extension: .ion
+    content: |
+      {order_id:101,customer_id:1,total:25.50}
+      {order_id:102,customer_id:1,total:12.00}
+      {order_id:103,customer_id:3,total:40.00}
+
+  - id: join
+    type: io.kestra.plugin.transform.Join
+    left: "{{ outputs.customers.uri }}"
+    right: "{{ outputs.orders.uri }}"
+    leftKey: customer_id
+    rightKey: customer_id
+    joinType: LEFT_OUTER

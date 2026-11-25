@@ -94,6 +94,14 @@ tasks:
       - "{{ outputs.orders.values.records }}"
       - "{{ outputs.status_lookup.values.records }}"
 
+  - id: join
+    type: io.kestra.plugin.transform.Join
+    left: "{{ outputs.orders.values.records }}"
+    right: "{{ outputs.map.records }}"
+    leftKey: user.id
+    rightKey: customer_id
+    mergeMode: NEST
+
   - id: assert
     type: io.kestra.plugin.core.execution.Assert
     conditions:
@@ -108,6 +116,9 @@ tasks:
       - "{{ outputs.select.uri | startsWith('kestra://') }}"
       - "{{ outputs.read_selected.records[0].status == 'ok' }}"
       - "{{ outputs.zip.records[1].status == 'pending' }}"
+      - "{{ outputs.join.records | length == 2 }}"
+      - "{{ outputs.join.outputSize == 2 }}"
+      - "{{ outputs.join.records[0].left.user.id == outputs.join.records[0].right.customer_id }}"
 
 finally:
   - id: purge
