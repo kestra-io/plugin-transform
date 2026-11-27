@@ -16,6 +16,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,8 +37,6 @@ public class JoinIOHandler implements AutoCloseable {
     private final List<IonStruct> leftRecords;
     private final List<IonStruct> rightRecords;
 
-    private final long leftSize;
-    private final long rightSize;
     private final MergeMode mergeMode;
     private final String leftLabel;
     private final String rightLabel;
@@ -46,7 +45,8 @@ public class JoinIOHandler implements AutoCloseable {
     // Null when the output is stored.
     private final List<Object> records;
 
-    private final List<IterableIonReader> openReaders = new ArrayList<>();
+    // Readers of the stored inputs, that also count their rows.
+    private final Map<JoinSide, IterableIonReader> readers = new EnumMap<>(JoinSide.class);
 
     // Null when the output is not stored.
     private Path outputFile;
@@ -83,9 +83,6 @@ public class JoinIOHandler implements AutoCloseable {
         leftRecords = leftInput.fromStorage() ? null : TransformTaskSupport.normalizeRecords(leftInput.value());
         rightRecords = rightInput.fromStorage() ? null : TransformTaskSupport.normalizeRecords(rightInput.value());
 
-        leftSize = countInputRows(JoinSide.LEFT);
-        rightSize = countInputRows(JoinSide.RIGHT);
-
         records = storeOutput ? null : new ArrayList<>();
 
         if (storeOutput) {
@@ -105,19 +102,57 @@ public class JoinIOHandler implements AutoCloseable {
         }
     }
 
-    /** A stored input is streamed by a new reader at each call, closed with this handler. */
+    /** A stored input is streamed by a reader closed with this handler. It can only be read once, which gives its row count. */
     public Iterable<IonStruct> getInputReader(JoinSide side) throws TransformException {
-        var inputRecords = side == JoinSide.LEFT ? leftRecords : rightRecords;
+        var inputRecords = inputRecords(side);
         if (inputRecords != null) {
             return inputRecords;
         }
+        if (readers.containsKey(side)) {
+            throw new IllegalStateException("The " + side + " input has already been read.");
+        }
         var reader = createInputReader(side);
-        openReaders.add(reader);
+        readers.put(side, reader);
         return reader;
     }
 
+    /** Complete once the join has read the input. */
     public long getInputCount(JoinSide side) {
-        return side == JoinSide.LEFT ? leftSize : rightSize;
+        var inputRecords = inputRecords(side);
+        if (inputRecords != null) {
+            return inputRecords.size();
+        }
+        var reader = readers.get(side);
+        if (reader == null) {
+            throw new IllegalStateException("The " + side + " input has not been read.");
+        }
+        return reader.getRowCount();
+    }
+
+    /**
+     * Chosen without reading the inputs. An input given as records is already in memory, so it is preferred
+     * to a stored one; two stored inputs are compared by file size. LEFT on a tie.
+     */
+    public JoinSide getSideToHoldInMemory() throws TransformException {
+        if (leftRecords != null && rightRecords != null) {
+            return leftRecords.size() <= rightRecords.size() ? JoinSide.LEFT : JoinSide.RIGHT;
+        }
+        if (leftRecords != null) {
+            return JoinSide.LEFT;
+        }
+        if (rightRecords != null) {
+            return JoinSide.RIGHT;
+        }
+        return storedSize(JoinSide.LEFT) <= storedSize(JoinSide.RIGHT) ? JoinSide.LEFT : JoinSide.RIGHT;
+    }
+
+    /** Once the join has read both inputs. */
+    public void warnEmptyInputs() {
+        for (var side : JoinSide.values()) {
+            if (getInputCount(side) == 0) {
+                warn(String.format(JoinMessages.EMPTY_INPUT, side));
+            }
+        }
     }
 
     public long getOutputSize() {
@@ -179,7 +214,7 @@ public class JoinIOHandler implements AutoCloseable {
         } catch (IOException e) {
             failure = e;
         }
-        for (var reader : openReaders) {
+        for (var reader : readers.values()) {
             try {
                 reader.close();
             } catch (IOException e) {
@@ -190,7 +225,7 @@ public class JoinIOHandler implements AutoCloseable {
                 }
             }
         }
-        openReaders.clear();
+        readers.clear();
         if (failure != null) {
             throw failure;
         }
@@ -264,8 +299,22 @@ public class JoinIOHandler implements AutoCloseable {
         }
     }
 
+    // Null when the input is a stored file.
+    private List<IonStruct> inputRecords(JoinSide side) {
+        return side == JoinSide.LEFT ? leftRecords : rightRecords;
+    }
+
     private URI storageUri(JoinSide side) {
         return (side == JoinSide.LEFT ? leftInput : rightInput).storageUri();
+    }
+
+    private long storedSize(JoinSide side) throws TransformException {
+        var inputUri = storageUri(side);
+        try {
+            return runContext.storage().getAttributes(inputUri).getSize();
+        } catch (IOException e) {
+            throw new TransformException(String.format(JoinMessages.READ_ERROR, inputUri), e);
+        }
     }
 
     /** The reader must be closed by the caller. */
@@ -285,27 +334,5 @@ public class JoinIOHandler implements AutoCloseable {
             }
             throw new TransformException(String.format(JoinMessages.READ_ERROR, inputUri), e);
         }
-    }
-
-    private long countInputRows(JoinSide side) throws TransformException {
-        var inputRecords = side == JoinSide.LEFT ? leftRecords : rightRecords;
-        var count = 0L;
-
-        if (inputRecords != null) {
-            count = inputRecords.size();
-        } else {
-            var inputUri = storageUri(side);
-            try (var reader = createInputReader(side)) {
-                for (var ignored : reader) {
-                    count++;
-                }
-            } catch (IOException | RuntimeException e) {
-                throw new TransformException(String.format(JoinMessages.READ_ERROR, inputUri), e);
-            }
-        }
-
-        if (count < 1) warn(String.format(JoinMessages.EMPTY_INPUT, side));
-
-        return count;
     }
 }

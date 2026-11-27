@@ -355,6 +355,8 @@ public class Join extends Task implements RunnableTask<Join.Output> {
                 rOnlyFirstMatchOnSemi
             ).join();
 
+            ioHandler.warnEmptyInputs();
+
             var result = ioHandler.storeOutputFile();
 
             return Output.builder()

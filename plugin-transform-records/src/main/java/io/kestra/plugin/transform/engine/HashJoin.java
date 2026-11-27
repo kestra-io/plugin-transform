@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-/** The smaller input is held in memory in a hash table, the other input is streamed. */
+/** One input is held in memory in a hash table (see JoinIOHandler.getSideToHoldInMemory), the other input is streamed. */
 public class HashJoin extends AbstractJoinImplementation {
 
     public HashJoin(
@@ -24,10 +24,10 @@ public class HashJoin extends AbstractJoinImplementation {
 
     @Override
     public void join() throws TransformException {
-        var tableSide = getTableSide();
+        var tableSide = ioHandler.getSideToHoldInMemory();
         var probeSide = tableSide.opposite();
 
-        // Build stage: hash table from the smaller input.
+        // Build stage: hash table from the input held in memory.
         var tableRows = keyOf(tableSide).index(ioHandler.getInputReader(tableSide));
         var hashTable = new HashMap<JoinKeyValue, List<KeyedRow>>();
         for (var tableRow : tableRows) {
@@ -63,11 +63,5 @@ public class HashJoin extends AbstractJoinImplementation {
 
         // Final stage for outer and anti joins: remaining mismatched rows of the hash table.
         emitUnmatched(tableRows, tableSide);
-    }
-
-    private JoinSide getTableSide() {
-        var leftSize = ioHandler.getInputCount(JoinSide.LEFT);
-        var rightSize = ioHandler.getInputCount(JoinSide.RIGHT);
-        return leftSize <= rightSize ? JoinSide.LEFT : JoinSide.RIGHT;
     }
 }

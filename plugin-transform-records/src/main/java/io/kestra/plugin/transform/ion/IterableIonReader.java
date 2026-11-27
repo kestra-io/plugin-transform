@@ -23,10 +23,17 @@ public class IterableIonReader implements Iterable<IonStruct>, AutoCloseable {
     // Name of the input in error messages.
     private final String inputName;
 
+    // Rows returned so far: the row count of the input once it has been fully iterated.
+    private long rowCount = 0;
+
     public IterableIonReader(InputStream inputStream, String inputName) {
         this.inputStream = inputStream;
         this.reader = IonValueUtils.system().newReader(inputStream);
         this.inputName = inputName;
+    }
+
+    public long getRowCount() {
+        return rowCount;
     }
 
     @Override
@@ -49,6 +56,7 @@ public class IterableIonReader implements Iterable<IonStruct>, AutoCloseable {
                     throw new IllegalArgumentException(String.format(NOT_A_STRUCT, inputName, nextType));
                 }
                 var struct = (IonStruct) IonValueUtils.system().newValue(reader);
+                rowCount++;
                 nextType = reader.next();
                 return struct;
             }

@@ -12,6 +12,7 @@ import io.kestra.plugin.transform.util.JoinType;
 import io.kestra.plugin.transform.util.MergeMode;
 import io.kestra.plugin.transform.util.MissingKeyAction;
 import io.kestra.plugin.transform.util.JoinMessages;
+import io.kestra.plugin.transform.util.JoinSide;
 import io.kestra.plugin.transform.util.OutputFormat;
 
 import com.amazon.ion.IonValue;
@@ -29,6 +30,7 @@ import io.kestra.core.models.validations.ModelValidator;
 import jakarta.inject.Inject;
 
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Iterator;
 import java.util.Arrays;
@@ -1529,7 +1531,6 @@ class JoinTest {
 
     /**
      * Tests that a stored input whose top-level values are not structs fails with a message naming the side and the found type.
-     * The message is searched in the whole cause chain, as the error may be wrapped by a read error.
      */
     @Test
     void nonStructRowThrowError() {
@@ -1548,13 +1549,8 @@ class JoinTest {
                 Exception exception = assertThrows(Exception.class,
                     () -> getOutput(runContext, joinImplementation, JoinType.INNER));
 
-                StringBuilder messages = new StringBuilder();
-                for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
-                    messages.append(cause.getMessage()).append('\n');
-                }
-
                 assertThat("Should show specific error for " + testEntry.getKey() + " non-struct row" + describe(joinImplementation, JoinType.INNER),
-                    messages.toString(), containsString(expectedError));
+                    exception.getMessage(), equalTo(expectedError));
             }
         }
     }
@@ -1655,6 +1651,72 @@ class JoinTest {
             assertThat("Output count should be correct" + testCase, runOutput.getOutputSize(), equalTo(1L));
             assertThat("Left count should be correct" + testCase, runOutput.getLeftSize(), equalTo(2L));
             assertThat("Right count should be correct" + testCase, runOutput.getRightSize(), equalTo(2L));
+        }
+    }
+
+    /**
+     * Build an in-memory record whose fields keep their order (key first), like the rows of a stored input.
+     * @param id Key value.
+     * @param field Name of the other field.
+     * @param value Value of the other field.
+     * @return Ordered record.
+     */
+    private Map<String, Object> recordOf(int id, String field, String value) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put(defaultKey, id);
+        record.put(field, value);
+        return record;
+    }
+
+    /**
+     * Tests that an input given as records is joined with a stored input, on either side,
+     * with the same results and counts as with two stored inputs.
+     */
+    @Test
+    void inMemoryAndStoredInputsAreJoined() throws Exception {
+
+        // Same rows as defaultLeftContent and defaultRightContent.
+        List<Map<String, Object>> leftRecords = List.of(
+            recordOf(1, "leftValue", "L1"),
+            recordOf(2, "leftValue", "L2-A"),
+            recordOf(2, "leftValue", "L2-B"),
+            recordOf(3, "leftValue", "L3"),
+            recordOf(5, "leftValue", "L5")
+        );
+        List<Map<String, Object>> rightRecords = List.of(
+            recordOf(2, "rightValue", "R2-A"),
+            recordOf(2, "rightValue", "R2-B"),
+            recordOf(3, "rightValue", "R3"),
+            recordOf(4, "rightValue", "R4"),
+            recordOf(5, "rightValue", "R5-A"),
+            recordOf(5, "rightValue", "R5-B")
+        );
+
+        RunContext runContext = getRunContext(defaultLeftContent, defaultRightContent);
+
+        for (JoinSide inMemorySide : JoinSide.values()) {
+            for (JoinImplementation joinImplementation : JoinImplementation.values()) {
+                for (JoinType joinType : JoinType.values()) {
+                    Join.JoinBuilder<?, ?> builder = taskBuilder(defaultKey, defaultKey)
+                        .joinImplementation(Property.ofValue(joinImplementation))
+                        .joinType(Property.ofValue(joinType));
+                    if (inMemorySide == JoinSide.LEFT) {
+                        builder.left(Property.ofValue(leftRecords));
+                    } else {
+                        builder.right(Property.ofValue(rightRecords));
+                    }
+
+                    Join.Output runOutput = builder.build().run(runContext);
+                    String testCase = " with " + inMemorySide + " records" + describe(joinImplementation, joinType);
+
+                    assertThat("Result should be the same as with stored inputs" + testCase,
+                        sortIonLines(readOutput(runOutput)), equalTo(sortIonLines(defaultExpectedResults.get(joinType))));
+                    assertThat("Left count should be correct" + testCase,
+                        runOutput.getLeftSize(), equalTo((long) leftRecords.size()));
+                    assertThat("Right count should be correct" + testCase,
+                        runOutput.getRightSize(), equalTo((long) rightRecords.size()));
+                }
+            }
         }
     }
 
