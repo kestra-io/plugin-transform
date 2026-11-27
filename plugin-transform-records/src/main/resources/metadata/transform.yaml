@@ -2,7 +2,7 @@ group: io.kestra.plugin.transform
 name: "transform"
 title: "Transform"
 description: "Transform typed records, variables, and Ion data."
-body: "Provide records, variables, or Ion files to filter, map, select, aggregate, unnest, or zip structured data with typed expressions, outputting transformed records or Ion data for downstream tasks."
+body: "Provide records, variables, or Ion files to filter, map, select, aggregate, unnest, zip, or join structured data with typed expressions, outputting transformed records or Ion data for downstream tasks. Joins support multiple join types (inner, outer, anti, semi) and algorithms (hash, sorted merge, nested loop), and let you configure the output structure to differentiate fields by side (overwriting, prefixing, nesting)."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

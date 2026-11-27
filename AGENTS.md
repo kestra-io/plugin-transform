@@ -36,6 +36,7 @@ This is a **multi-module** plugin with 4 submodules:
 
 - `io.kestra.plugin.transform.Aggregate`
 - `io.kestra.plugin.transform.Filter`
+- `io.kestra.plugin.transform.Join`
 - `io.kestra.plugin.transform.Map`
 - `io.kestra.plugin.transform.Select`
 - `io.kestra.plugin.transform.Unnest`
@@ -44,6 +45,21 @@ This is a **multi-module** plugin with 4 submodules:
 **plugin-transform-arrow:**
 
 - `io.kestra.plugin.transform.arrow.Query`
+
+### Join task layout (plugin-transform-records)
+
+`Join` joins two inputs on a key (inner, outer, anti and semi joins). Its classes are spread over the shared packages of `io.kestra.plugin.transform`:
+
+- `engine`: join implementations (`AbstractJoinImplementation`, `HashJoin`, `NestedLoopJoin`, `SortedMergeJoin`), `JoinKey`, `JoinKeyValue` (key value compared the same way by every implementation), `KeyedRow`
+- `util`: property enums (`JoinType`, `JoinImplementation`, `MergeMode`, `MissingKeyAction`), `JoinSide`, `JoinMessages`, and `JoinIOHandler` (input reading and output writing through the run context)
+- `ion`: `IterableIonReader` (streams a stored Ion file)
+
+Join-specific rules:
+
+- Keep the `leftSize`, `rightSize` and `outputSize` outputs; metrics may only be added on top of them.
+- `leftLabel`, `rightLabel` and `prefixSeparator` are dynamic properties; labels are checked (not blank, distinct) at run time, and the separator may be empty.
+- Join keys are split on `.`, not evaluated with the shared expression language.
+- `HASH` must hold only one input in memory and stream the other: an input given as records (already in memory), otherwise the smaller stored file. A stored file is never loaded in memory when the other input already is.
 
 ### Project Structure
 

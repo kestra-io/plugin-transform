@@ -1,6 +1,6 @@
 # How to use the Transform plugin
 
-These tasks let you reshape, filter, combine, flatten, and summarize structured data without writing custom code. They work both with in-memory records and with stored Ion files, so the same tasks can be used for small workflow variables and larger streamed datasets.
+These tasks let you reshape, filter, combine, join, flatten, and summarize structured data without writing custom code. They work both with in-memory records and with stored Ion files, so the same tasks can be used for small workflow variables and larger streamed datasets.
 
 ## Common Inputs And Outputs
 
@@ -8,6 +8,7 @@ Most tasks accept records directly or as a stored Ion file.
 
 - `from`: used by tasks that read a single input, such as `Map`, `Filter`, `Unnest`, and `Aggregate`
 - `inputs`: used by tasks that read multiple inputs, such as `Select` and `Zip`
+- `left` and `right`: used by `Join`, which matches rows of two inputs on a key
 
 These inputs can typically be:
 
@@ -133,3 +134,125 @@ Use positional references when you want to distinguish fields coming from differ
 - `last(status)`
 
 Use the shared expression language for per-record transforms and conditions. Use aggregate expressions when summarizing grouped records.
+
+## Join
+
+`Join` matches the rows of two inputs, `left` and `right`, whose key values are equal, the way you would join two tables in SQL.\
+Keys of different types never match; decimals are compared by value (`1.0` equals `1.00`) and timestamps by instant, whatever their offset or precision.\
+Each input can be a list of records or a stored Ion file URI, and the common `outputType` and `outputFormat` options apply.\
+Besides `uri` or `records`, the task outputs the row counts `outputSize`, `leftSize` and `rightSize`.
+
+### Join types
+
+Several join types are supported, allowing different operations to be applied on the input data:
+
+- **inner join (default)**
+- outer joins: full outer, left outer, right outer
+- anti joins: left anti, right anti
+- semi joins: left semi, right semi
+
+Note that **anti** and **semi** joins are not *merge-type* joins, which means that they only filter rows from one side (left or right) without combining data from both inputs.
+
+### Join implementations
+
+These are algorithmic strategies for performing the join.\
+The choice does not affect the output content, but it can influence performance and memory use, depending on dataset size and whether inputs are sorted.\
+Output row order may also vary depending on this.
+
+Available implementations:
+
+- **hash (default)**: only one input is held in memory, in a hash table; the other input is streamed. The task chooses an input given as records, as it is already in memory, otherwise the smaller stored file.
+- nested loop: the right input is held in memory and compared with every row of the streamed left input, so the run time grows with the product of the input sizes; only suited to small inputs.
+- sorted merge: both inputs are held in memory to be sorted on the key.
+
+When an input is given as records rather than a stored file, it is already in memory, whatever the implementation.
+
+The task sets no memory limit: an input held in memory must fit in the memory of the worker. With large inputs:
+- prefer the hash implementation, which holds only one input in memory;
+- reduce the inputs before the join: drop the rows you do not need with `Filter`, and keep only the fields you need with `Map`.
+
+### Merge mode
+
+The `mergeMode` property allows you to configure the output structure to differentiate fields by side.\
+It can have the following values:
+- **overwrite (default)**: with [merge-type joins](#join-types), fields that have identical names between inputs will be overwritten in matched rows.\
+As fields from **left** are written before **right** ones, the remaining values will be those from **right** in the case of overwriting.
+- **prefix**: adds a prefix to fields names according to side with `leftLabel` and `rightLabel` values, and a separator character specified by the `prefixSeparator` property.\
+For example, with common `name` field, `leftLabel = "L"`, `rightLabel = "R"` and `prefixSeparator = "_"`, output could be:
+```json
+{"L_name": "x", "R_name": "y", ...}
+...
+```
+- **nest**: nest fields in two objects for each side named by `leftLabel` and `rightLabel`.\
+For example, with common `name` field and `leftLabel = "left"` and `rightLabel = "right"`, output could be:
+```json
+{"left": {"name":"x", ...}, "right": {"name":"y", ...}
+...
+```
+
+`leftLabel`, `rightLabel` and `prefixSeparator` accept expressions. Labels are checked when the task runs: they must not be blank and must differ. The separator can be empty.
+
+### Accepted key types
+
+Following **Ion** types are accepted for key fields:
+- `BOOL`,
+- `DECIMAL`,
+- `FLOAT`,
+- `INT`,
+- `STRING`,
+- `TIMESTAMP`.
+
+Additionally, `NULL` type is accepted only if `onMissingKey` value is `IGNORE` or `WARNING`, which is not the case by default (see [Missing key](#missing-key)).
+
+Values only match when they have the same type: for example, the `INT` value `1` does not match the `DECIMAL` value `1.0`.
+
+### Special cases
+
+#### Nested key
+
+You can use a nested field as join key with an object-like syntax.
+
+For example, for this input:
+
+```json
+{"id": {"a": 1, "b": "x"}}
+...
+```
+
+The `a` field can be accessed with the following key: `id.a`.\
+This works with more levels of nesting too.\
+Note however that the key does not use the [common expression language](#common-expression-language): it is just a raw string that is split on the dot sign, so field names may contain any other character (e.g. `order-id`).
+
+The task could fail in the following contexts of nested fields:
+- using a nested key that is too deep (not reachable) for the actual row of input, for example: `id.a.z` for the previous input.
+- using a key that is too shallow for the actual row of input, meaning the value is still a nested row (which is not a valid type), for example: `id` for the previous input.
+
+#### Empty input
+
+The task will **not fail** if one or both input(s) is empty, as this case is not strictly invalid for join algorithms.\
+However you will get a log message for each empty input.
+
+#### Missing key
+
+By default, the task will **fail** if the key field does not exist in at least one row of an input or has a `NULL` value.
+
+This behaviour is defined by the `onMissingKey` optional property, which has the `FAIL` default value.\
+Other possible values are:
+- `WARNING`: sets the task state to `WARNING`, and a log will be emitted for the first corresponding row of each input.
+- `IGNORE`: allows the task to continue with no state change, and a log will be emitted for the first corresponding row of each input.
+
+If there are missing keys in both inputs, they will not match.
+
+#### Semi joins identical rows
+
+By default, semi joins can output multiple identical rows, as one row can match with several rows from other side, but without retrieving the fields from the other side.
+
+You can change this behaviour to get only the first matched rows, by putting the value of
+`onlyFirstMatchOnSemi` property to `true`.\
+This property is optional, and its default is `false`.
+
+#### Sorted merge specific errors
+
+Some errors will occur only with sorted merge implementation, as it needs a stricter data consistency by design:
+- different key types between rows from a single input,
+- different key types between inputs.

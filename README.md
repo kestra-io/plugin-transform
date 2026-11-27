@@ -48,6 +48,50 @@
 - Provides plugin components under `io.kestra.plugin`.
 - Keeps the implementation focused on the integration scope exposed by this repository.
 
+### Join
+
+`io.kestra.plugin.transform.Join` joins two inputs on a key, the way you would join two tables in SQL. Flows often fetch related data from different sources, such as a database query and an API export, and need to combine them on a common key without loading them into a database or writing a custom script.
+
+- **Inputs:** two inputs (`left` and `right`), either records or stored Ion files, usually outputs of previous tasks, plus a key on each side (`leftKey`, `rightKey`). Nested keys use dot notation, e.g. `customer.id`.
+- **Join types** (`joinType`): `INNER` (default), `FULL_OUTER`, `LEFT_OUTER`, `RIGHT_OUTER`, `LEFT_ANTI`, `RIGHT_ANTI`, `LEFT_SEMI`, `RIGHT_SEMI`.
+- **Join implementations** (`joinImplementation`): `HASH` (default), `NESTED_LOOP`, `SORTED_MERGE`. They return the same rows, possibly in a different order.
+- **Merge modes** (`mergeMode`): how fields from each side are combined. `OVERWRITE` (default) merges fields, and the right value wins when names collide. `PREFIX` renames fields with `leftLabel`/`rightLabel` and `prefixSeparator`. `NEST` puts each side in its own object.
+- **Task behaviors on missing key** (`onMissingKey`): `FAIL` (default), `WARNING` (the task ends in `WARNING` state) or `IGNORE`.
+- **Outputs:** `uri` of the joined Ion file or `records` (according to `outputType`), and the row counts `outputSize`, `leftSize` and `rightSize`.
+
+```yaml
+id: join_customers_orders
+namespace: company.team
+
+tasks:
+  - id: customers
+    type: io.kestra.plugin.core.storage.Write
+    extension: .ion
+    content: |
+      {customer_id:1,name:"Alice"}
+      {customer_id:2,name:"Bob"}
+      {customer_id:3,name:"Carol"}
+
+  - id: orders
+    type: io.kestra.plugin.core.storage.Write
+    extension: .ion
+    content: |
+      {order_id:101,customer_id:1,total:25.50}
+      {order_id:102,customer_id:1,total:12.00}
+      {order_id:103,customer_id:3,total:40.00}
+      {order_id:104,customer_id:4,total:8.75}
+
+  - id: join
+    type: io.kestra.plugin.transform.Join
+    left: "{{ outputs.customers.uri }}"
+    right: "{{ outputs.orders.uri }}"
+    leftKey: customer_id
+    rightKey: customer_id
+    joinType: INNER
+```
+
+The [plugin documentation](plugin-transform-records/src/main/resources/doc/io.kestra.plugin.transform.md#join) covers every option in detail.
+
 ## Documentation
 * Full documentation can be found under: [kestra.io/docs](https://kestra.io/docs)
 * Documentation for developing a plugin is included in the [Plugin Developer Guide](https://kestra.io/docs/plugin-developer-guide/)

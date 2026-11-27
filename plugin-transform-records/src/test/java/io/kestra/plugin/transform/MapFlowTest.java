@@ -147,6 +147,24 @@ class MapFlowTest {
     }
 
     @Test
+    @ExecuteFlow("flows/join_flow_store.yaml")
+    void executesJoinStoreFlow(Execution execution) {
+        assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
+
+        TaskRun taskRun = execution.findTaskRunsByTaskId("join").getFirst();
+        Map<String, Object> outputs = (Map<String, Object>) taskRun.getOutputs();
+
+        assertThat(outputs.containsKey("records"), is(false));
+        Object uri = outputs.get("uri");
+        assertThat(uri != null, is(true));
+        assertThat(uri.toString().startsWith("kestra://"), is(true));
+        // Alice matches two orders, Bob none (kept by the left outer join), order 103 has no customer.
+        assertThat(((Number) outputs.get("outputSize")).longValue(), is(3L));
+        assertThat(((Number) outputs.get("leftSize")).longValue(), is(2L));
+        assertThat(((Number) outputs.get("rightSize")).longValue(), is(3L));
+    }
+
+    @Test
     @ExecuteFlow("flows/select_flow.yaml")
     void executesSelectFlow(Execution execution) {
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));

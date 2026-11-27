@@ -15,7 +15,7 @@ class RunnerTest {
     @Test
     @ExecuteFlow("sanity-checks/all_records.yaml")
     void all_records(Execution execution) {
-        assertThat(execution.getTaskRunList(), hasSize(11));
+        assertThat(execution.getTaskRunList(), hasSize(12));
         assertThat(execution.getState().getCurrent(), is(State.Type.SUCCESS));
     }
 }
