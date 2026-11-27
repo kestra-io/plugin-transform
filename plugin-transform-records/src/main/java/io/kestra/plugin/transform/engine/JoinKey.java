@@ -98,8 +98,8 @@ public final class JoinKey {
      * @throws TransformException If a key value cannot be extracted.
      */
     public List<KeyedRow> index(Iterable<IonStruct> rows) throws TransformException {
-        List<KeyedRow> keyedRows = new ArrayList<>();
-        for (IonStruct row : rows) {
+        var keyedRows = new ArrayList<KeyedRow>();
+        for (var row : rows) {
             keyedRows.add(new KeyedRow(row, extractKeyValue(row)));
         }
         return keyedRows;
@@ -113,7 +113,7 @@ public final class JoinKey {
      * @throws TransformException If the value cannot be extracted.
      */
     private IonValue traverseRow(IonStruct row, int depth) throws TransformException {
-        IonValue val = row.get(keyPath.get(depth));
+        var val = row.get(keyPath.get(depth));
         if (depth < keyPath.size() - 1) {
             if (val != null && val.getType() == IonType.STRUCT) {
                 return traverseRow((IonStruct) val, depth + 1);
@@ -139,7 +139,7 @@ public final class JoinKey {
      * @throws TransformException If the action is FAIL.
      */
     private void handleMissingKey(IonStruct row) throws TransformException {
-        String message = String.format(JoinMessages.MISSING_KEY, keyString, keySide, row);
+        var message = String.format(JoinMessages.MISSING_KEY, keyString, keySide, row);
         switch (onMissingKey) {
             case FAIL -> throw new TransformException(message);
             case WARNING -> {

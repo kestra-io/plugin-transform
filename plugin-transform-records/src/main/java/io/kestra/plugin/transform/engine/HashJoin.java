@@ -1,6 +1,5 @@
 package io.kestra.plugin.transform.engine;
 
-import com.amazon.ion.IonStruct;
 import com.amazon.ion.IonValue;
 import io.kestra.plugin.transform.util.JoinIOHandler;
 import io.kestra.plugin.transform.util.JoinSide;
@@ -10,7 +9,6 @@ import io.kestra.plugin.transform.util.TransformException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Hash Join implementation.
@@ -39,23 +37,23 @@ public class HashJoin extends AbstractJoinImplementation {
     /** {@inheritDoc} */
     @Override
     public void join() throws TransformException {
-        JoinSide tableSide = getTableSide();
-        JoinSide probeSide = tableSide.opposite();
+        var tableSide = getTableSide();
+        var probeSide = tableSide.opposite();
 
         // Build stage: hash table from the smaller input.
-        List<KeyedRow> tableRows = keyOf(tableSide).index(ioHandler.getInputReader(tableSide));
-        Map<IonValue, List<KeyedRow>> hashTable = new HashMap<>();
-        for (KeyedRow tableRow : tableRows) {
+        var tableRows = keyOf(tableSide).index(ioHandler.getInputReader(tableSide));
+        var hashTable = new HashMap<IonValue, List<KeyedRow>>();
+        for (var tableRow : tableRows) {
             if (isJoinable(tableRow.getKey())) {
                 hashTable.computeIfAbsent(tableRow.getKey(), k -> new ArrayList<>()).add(tableRow);
             }
         }
 
         // Probe stage: streaming the opposite input to search matches (and writing results).
-        JoinKey probeKey = keyOf(probeSide);
-        for (IonStruct probeRow : ioHandler.getInputReader(probeSide)) {
-            IonValue keyValue = probeKey.extractKeyValue(probeRow);
-            List<KeyedRow> currentMatches = isJoinable(keyValue) ? hashTable.get(keyValue) : null;
+        var probeKey = keyOf(probeSide);
+        for (var probeRow : ioHandler.getInputReader(probeSide)) {
+            var keyValue = probeKey.extractKeyValue(probeRow);
+            var currentMatches = isJoinable(keyValue) ? hashTable.get(keyValue) : null;
 
             // Writes mismatched row of probe side for outer and anti joins
             if (currentMatches == null) {
@@ -66,8 +64,8 @@ public class HashJoin extends AbstractJoinImplementation {
             }
 
             // Writes all matched rows in hash table for current row of probe side
-            boolean probeMatched = false;
-            for (KeyedRow tableRow : currentMatches) {
+            var probeMatched = false;
+            for (var tableRow : currentMatches) {
                 if (tableSide == JoinSide.LEFT) {
                     emitMatch(tableRow.getRow(), probeRow, tableRow.isMatched(), probeMatched);
                 } else {
@@ -87,8 +85,8 @@ public class HashJoin extends AbstractJoinImplementation {
      * @return The side (left or right).
      */
     private JoinSide getTableSide() {
-        long leftSize = ioHandler.getInputCount(JoinSide.LEFT);
-        long rightSize = ioHandler.getInputCount(JoinSide.RIGHT);
+        var leftSize = ioHandler.getInputCount(JoinSide.LEFT);
+        var rightSize = ioHandler.getInputCount(JoinSide.RIGHT);
         return leftSize <= rightSize ? JoinSide.LEFT : JoinSide.RIGHT;
     }
 }

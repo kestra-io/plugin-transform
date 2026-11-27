@@ -155,7 +155,7 @@ public abstract class AbstractJoinImplementation {
         if (!keepsUnmatched(side)) {
             return;
         }
-        for (KeyedRow row : rows) {
+        for (var row : rows) {
             if (!row.isMatched()) {
                 ioHandler.writeSideRow(row.getRow(), side);
             }

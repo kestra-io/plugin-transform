@@ -43,8 +43,8 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
     /** {@inheritDoc} */
     @Override
     public void join() throws TransformException {
-        List<KeyedRow> sortedLeft = leftKey.index(ioHandler.getInputReader(JoinSide.LEFT));
-        List<KeyedRow> sortedRight = rightKey.index(ioHandler.getInputReader(JoinSide.RIGHT));
+        var sortedLeft = leftKey.index(ioHandler.getInputReader(JoinSide.LEFT));
+        var sortedRight = rightKey.index(ioHandler.getInputReader(JoinSide.RIGHT));
 
         // Checked before sorting, so that the comparator cannot fail.
         checkSameKeyType(sortedLeft, sortedRight);
@@ -63,16 +63,16 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
      * @throws TransformException If a row cannot be written.
      */
     private void mergeLoop(List<KeyedRow> sortedLeft, List<KeyedRow> sortedRight) throws TransformException {
-        int l = 0;
-        int r = 0;
-        int leftSize = sortedLeft.size();
-        int rightSize = sortedRight.size();
+        var l = 0;
+        var r = 0;
+        var leftSize = sortedLeft.size();
+        var rightSize = sortedRight.size();
 
         while (l < leftSize && r < rightSize) {
-            IonValue leftValue = sortedLeft.get(l).getKey();
-            IonValue rightValue = sortedRight.get(r).getKey();
+            var leftValue = sortedLeft.get(l).getKey();
+            var rightValue = sortedRight.get(r).getKey();
 
-            int leftToRightCompare = compareIonValues(leftValue, rightValue);
+            var leftToRightCompare = compareIonValues(leftValue, rightValue);
 
             // Mismatch from Left
             if (leftToRightCompare < 0) {
@@ -93,8 +93,8 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
             }
 
             // Equality means a match (except for null values): find the groups of equal keys on both sides
-            int l0 = l;
-            int r0 = r;
+            var l0 = l;
+            var r0 = r;
             while (l < leftSize && compareIonValues(leftValue, sortedLeft.get(l).getKey()) == 0) l++;
             while (r < rightSize && compareIonValues(rightValue, sortedRight.get(r).getKey()) == 0) r++;
 
@@ -106,10 +106,10 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
             }
 
             // True match
-            for (int i = l0; i < l; i++) {
-                KeyedRow leftRow = sortedLeft.get(i);
-                for (int j = r0; j < r; j++) {
-                    KeyedRow rightRow = sortedRight.get(j);
+            for (var i = l0; i < l; i++) {
+                var leftRow = sortedLeft.get(i);
+                for (var j = r0; j < r; j++) {
+                    var rightRow = sortedRight.get(j);
                     emitMatch(leftRow.getRow(), rightRow.getRow(), leftRow.isMatched(), rightRow.isMatched());
                     leftRow.markMatched();
                     rightRow.markMatched();
@@ -130,9 +130,9 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
      */
     private void checkSameKeyType(List<KeyedRow> left, List<KeyedRow> right) throws TransformException {
         IonValue reference = null;
-        for (List<KeyedRow> rows : List.of(left, right)) {
-            for (KeyedRow row : rows) {
-                IonValue key = row.getKey();
+        for (var rows : List.of(left, right)) {
+            for (var row : rows) {
+                var key = row.getKey();
                 if (!isJoinable(key)) {
                     continue;
                 }
@@ -153,8 +153,8 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
      * @return A negative value if the first value is lesser than the second, positive if greater, and 0 if both are equals.
      */
     private static int compareIonValues(IonValue va, IonValue vb) {
-        boolean vaNull = !isJoinable(va);
-        boolean vbNull = !isJoinable(vb);
+        var vaNull = !isJoinable(va);
+        var vbNull = !isJoinable(vb);
         if (vaNull && vbNull) return 0;
         if (vaNull) return 1;
         if (vbNull) return -1;

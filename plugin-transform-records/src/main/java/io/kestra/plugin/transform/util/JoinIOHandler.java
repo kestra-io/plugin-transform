@@ -139,7 +139,7 @@ public class JoinIOHandler implements AutoCloseable {
                 outputStream = TransformTaskSupport.wrapCompression(TransformTaskSupport.bufferedOutput(outputFile));
                 ionWriter = createWriter(outputStream, outputFormat);
             } catch (IOException e) {
-                TransformException exception = new TransformException(JoinMessages.STORAGE_ERROR, e);
+                var exception = new TransformException(JoinMessages.STORAGE_ERROR, e);
                 try {
                     close();
                 } catch (IOException closeException) {
@@ -158,11 +158,11 @@ public class JoinIOHandler implements AutoCloseable {
      * @throws TransformException If the stored input cannot be opened.
      */
     public Iterable<IonStruct> getInputReader(JoinSide side) throws TransformException {
-        List<IonStruct> inputRecords = side == JoinSide.LEFT ? leftRecords : rightRecords;
+        var inputRecords = side == JoinSide.LEFT ? leftRecords : rightRecords;
         if (inputRecords != null) {
             return inputRecords;
         }
-        IterableIonReader reader = createInputReader(storageUri(side));
+        var reader = createInputReader(storageUri(side));
         openReaders.add(reader);
         return reader;
     }
@@ -277,7 +277,7 @@ public class JoinIOHandler implements AutoCloseable {
         } catch (IOException e) {
             failure = e;
         }
-        for (IterableIonReader reader : openReaders) {
+        for (var reader : openReaders) {
             try {
                 reader.close();
             } catch (IOException e) {
@@ -303,12 +303,12 @@ public class JoinIOHandler implements AutoCloseable {
     private IonStruct buildRow(IonStruct leftRow, IonStruct rightRow) {
         // Left first, then right: on a field name conflict, the right value replaces the left one
         // and the field keeps its first position (IonStruct.put would move it to the end).
-        Map<String, IonValue> fields = new LinkedHashMap<>();
+        var fields = new LinkedHashMap<String, IonValue>();
         addFields(fields, leftRow, leftLabel);
         addFields(fields, rightRow, rightLabel);
 
-        IonStruct merged = IonValueUtils.system().newEmptyStruct();
-        for (Map.Entry<String, IonValue> field : fields.entrySet()) {
+        var merged = IonValueUtils.system().newEmptyStruct();
+        for (var field : fields.entrySet()) {
             // Values are cloned because a value cannot be a member of multiple structs.
             merged.add(field.getKey(), IonValueUtils.cloneValue(field.getValue()));
         }
@@ -328,12 +328,12 @@ public class JoinIOHandler implements AutoCloseable {
         switch (mergeMode) {
             case NEST -> fields.put(label, row);
             case PREFIX -> {
-                for (IonValue field : row) {
+                for (var field : row) {
                     fields.put(label + prefixSeparator + field.getFieldName(), field);
                 }
             }
             case OVERWRITE -> {
-                for (IonValue field : row) {
+                for (var field : row) {
                     fields.put(field.getFieldName(), field);
                 }
             }
@@ -384,7 +384,7 @@ public class JoinIOHandler implements AutoCloseable {
         } finally {
             ionWriter = null;
             if (outputStream != null) {
-                OutputStream stream = outputStream;
+                var stream = outputStream;
                 outputStream = null;
                 stream.close();
             }
@@ -430,15 +430,15 @@ public class JoinIOHandler implements AutoCloseable {
      * @throws TransformException If the stored input cannot be read.
      */
     private long countInputRows(JoinSide side) throws TransformException {
-        List<IonStruct> inputRecords = side == JoinSide.LEFT ? leftRecords : rightRecords;
-        long count = 0;
+        var inputRecords = side == JoinSide.LEFT ? leftRecords : rightRecords;
+        var count = 0L;
 
         if (inputRecords != null) {
             count = inputRecords.size();
         } else {
-            URI inputUri = storageUri(side);
-            try (IterableIonReader reader = createInputReader(inputUri)) {
-                for (IonStruct ignored : reader) {
+            var inputUri = storageUri(side);
+            try (var reader = createInputReader(inputUri)) {
+                for (var ignored : reader) {
                     count++;
                 }
             } catch (IOException | RuntimeException e) {

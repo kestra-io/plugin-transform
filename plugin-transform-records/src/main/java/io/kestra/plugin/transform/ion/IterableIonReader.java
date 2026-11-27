@@ -46,7 +46,7 @@ public class IterableIonReader implements Iterable<IonStruct>, AutoCloseable {
                 if (nextType == null) {
                     throw new NoSuchElementException();
                 }
-                IonStruct struct = (IonStruct) IonValueUtils.system().newValue(reader);
+                var struct = (IonStruct) IonValueUtils.system().newValue(reader);
                 nextType = reader.next();
                 return struct;
             }

@@ -1,13 +1,9 @@
 package io.kestra.plugin.transform.engine;
 
-import com.amazon.ion.IonStruct;
-import com.amazon.ion.IonValue;
 import io.kestra.plugin.transform.util.JoinIOHandler;
 import io.kestra.plugin.transform.util.JoinSide;
 import io.kestra.plugin.transform.util.JoinType;
 import io.kestra.plugin.transform.util.TransformException;
-
-import java.util.List;
 
 /**
  * Nested Loop Join implementation.
@@ -36,14 +32,14 @@ public class NestedLoopJoin extends AbstractJoinImplementation {
     /** {@inheritDoc} */
     @Override
     public void join() throws TransformException {
-        List<KeyedRow> rightRows = rightKey.index(ioHandler.getInputReader(JoinSide.RIGHT));
+        var rightRows = rightKey.index(ioHandler.getInputReader(JoinSide.RIGHT));
 
-        for (IonStruct leftRow : ioHandler.getInputReader(JoinSide.LEFT)) {
-            IonValue leftKeyValue = leftKey.extractKeyValue(leftRow);
-            boolean leftMatched = false;
+        for (var leftRow : ioHandler.getInputReader(JoinSide.LEFT)) {
+            var leftKeyValue = leftKey.extractKeyValue(leftRow);
+            var leftMatched = false;
 
             if (isJoinable(leftKeyValue)) {
-                for (KeyedRow rightRow : rightRows) {
+                for (var rightRow : rightRows) {
                     if (isJoinable(rightRow.getKey()) && leftKeyValue.equals(rightRow.getKey())) {
                         emitMatch(leftRow, rightRow.getRow(), leftMatched, rightRow.isMatched());
                         rightRow.markMatched();

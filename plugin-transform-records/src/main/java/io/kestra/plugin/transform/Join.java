@@ -301,23 +301,23 @@ public class Join extends Task implements RunnableTask<Join.Output> {
     /** {@inheritDoc} */
     @Override
     public Join.Output run(RunContext runContext) throws Exception {
-        String rLeftKey =                        requireNonBlank(render(leftKey, String.class, "leftKey", runContext), "leftKey");
-        String rRightKey =                       requireNonBlank(render(rightKey, String.class, "rightKey", runContext), "rightKey");
-        JoinImplementation rJoinImplementation = render(joinImplementation, JoinImplementation.class, "joinImplementation", runContext);
-        JoinType rJoinType =                     render(joinType, JoinType.class, "joinType", runContext);
-        MergeMode rMergeMode =                   render(mergeMode, MergeMode.class, "mergeMode", runContext);
-        boolean rOnlyFirstMatchOnSemi =          render(onlyFirstMatchOnSemi, Boolean.class, "onlyFirstMatchOnSemi", runContext);
-        MissingKeyAction rOnMissingKey =         render(onMissingKey, MissingKeyAction.class, "onMissingKey", runContext);
-        OutputFormat rOutputFormat =             render(outputFormat, OutputFormat.class, "outputFormat", runContext);
-        OutputMode rOutputType =                 render(outputType, OutputMode.class, "outputType", runContext);
+        var rLeftKey = requireNonBlank(render(leftKey, String.class, "leftKey", runContext), "leftKey");
+        var rRightKey = requireNonBlank(render(rightKey, String.class, "rightKey", runContext), "rightKey");
+        var rJoinImplementation = render(joinImplementation, JoinImplementation.class, "joinImplementation", runContext);
+        var rJoinType = render(joinType, JoinType.class, "joinType", runContext);
+        var rMergeMode = render(mergeMode, MergeMode.class, "mergeMode", runContext);
+        var rOnlyFirstMatchOnSemi = render(onlyFirstMatchOnSemi, Boolean.class, "onlyFirstMatchOnSemi", runContext);
+        var rOnMissingKey = render(onMissingKey, MissingKeyAction.class, "onMissingKey", runContext);
+        var rOutputFormat = render(outputFormat, OutputFormat.class, "outputFormat", runContext);
+        var rOutputType = render(outputType, OutputMode.class, "outputType", runContext);
 
-        TransformTaskSupport.ResolvedInput rLeft = resolveInput(left, "left", runContext);
-        TransformTaskSupport.ResolvedInput rRight = resolveInput(right, "right", runContext);
+        var rLeft = resolveInput(left, "left", runContext);
+        var rRight = resolveInput(right, "right", runContext);
 
-        boolean anyFromStorage = rLeft.fromStorage() || rRight.fromStorage();
-        boolean storeOutput = rOutputType == OutputMode.AUTO ? anyFromStorage : rOutputType == OutputMode.STORE;
+        var anyFromStorage = rLeft.fromStorage() || rRight.fromStorage();
+        var storeOutput = rOutputType == OutputMode.AUTO ? anyFromStorage : rOutputType == OutputMode.STORE;
 
-        try (JoinIOHandler ioHandler = new JoinIOHandler(
+        try (var ioHandler = new JoinIOHandler(
             runContext,
             rLeft,
             rRight,
@@ -329,8 +329,8 @@ public class Join extends Task implements RunnableTask<Join.Output> {
             prefixSeparator
         )) {
 
-            JoinKey leftJoinKey = new JoinKey(rLeftKey, JoinSide.LEFT, rOnMissingKey, ioHandler);
-            JoinKey rightJoinKey = new JoinKey(rRightKey, JoinSide.RIGHT, rOnMissingKey, ioHandler);
+            var leftJoinKey = new JoinKey(rLeftKey, JoinSide.LEFT, rOnMissingKey, ioHandler);
+            var rightJoinKey = new JoinKey(rRightKey, JoinSide.RIGHT, rOnMissingKey, ioHandler);
 
             AbstractJoinImplementation.of(
                 rJoinImplementation,
@@ -341,7 +341,7 @@ public class Join extends Task implements RunnableTask<Join.Output> {
                 rOnlyFirstMatchOnSemi
             ).join();
 
-            URI result = ioHandler.storeOutputFile();
+            var result = ioHandler.storeOutputFile();
 
             return Output.builder()
                 .uri(result)
@@ -428,7 +428,7 @@ public class Join extends Task implements RunnableTask<Join.Output> {
             if (value == null) {
                 return null;
             }
-            String raw = String.valueOf(value).trim();
+            var raw = String.valueOf(value).trim();
             return OutputMode.valueOf(raw.toUpperCase(Locale.ROOT));
         }
     }
