@@ -287,18 +287,14 @@ public class Join extends Task implements RunnableTask<Join.Output> {
     @Builder.Default
     private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
 
-    /**
-     * Checks that left and right labels are distinct.
-     * @return True if labels are distinct or one of them is missing (handled by other constraints).
-     */
     @Schema(hidden = true)
     @JsonIgnore
     @AssertTrue(message = "leftLabel and rightLabel must be different")
     public boolean isLabelsDistinct() {
+        // A missing label is reported by @NotBlank, not here.
         return leftLabel == null || rightLabel == null || !leftLabel.equals(rightLabel);
     }
 
-    /** {@inheritDoc} */
     @Override
     public Join.Output run(RunContext runContext) throws Exception {
         var rLeftKey = requireNonBlank(render(leftKey, String.class, "leftKey", runContext), "leftKey");
@@ -354,18 +350,7 @@ public class Join extends Task implements RunnableTask<Join.Output> {
         }
     }
 
-    /**
-     * Renders a dynamic property with Pebble expression or raw value.
-     * Exceptions are thrown with property name.
-     * A property that renders to nothing is an error, never silently replaced by a default value.
-     * @param <T> Expected type of the rendered value.
-     * @param property The property to render.
-     * @param type Expected class of the rendered value.
-     * @param propertyName Name of the property.
-     * @param runContext Kestra run Context.
-     * @return The rendered value.
-     * @throws TransformException If the property cannot be rendered or renders to nothing.
-     */
+    /** A property that renders to nothing is an error, never silently replaced by a default value. */
     private <T> T render(
         Property<T> property,
         Class<T> type,
@@ -380,14 +365,6 @@ public class Join extends Task implements RunnableTask<Join.Output> {
         return rendered.orElseThrow(() -> new TransformException(String.format(JoinMessages.BLANK_PROPERTY, propertyName)));
     }
 
-    /**
-     * Resolves an input property to records, Ion values or a storage URI.
-     * @param property The input property.
-     * @param propertyName Name of the property.
-     * @param runContext Kestra run Context.
-     * @return The resolved input.
-     * @throws TransformException If the property cannot be rendered or renders to a blank value.
-     */
     private TransformTaskSupport.ResolvedInput resolveInput(
         Property<Object> property,
         String propertyName,
@@ -404,13 +381,6 @@ public class Join extends Task implements RunnableTask<Join.Output> {
         return resolved;
     }
 
-    /**
-     * Checks that a rendered string property is not blank.
-     * @param value The rendered value.
-     * @param propertyName Name of the property.
-     * @return The value if not blank.
-     * @throws TransformException If the value is blank.
-     */
     private String requireNonBlank(String value, String propertyName) throws TransformException {
         if (value == null || value.isBlank()) {
             throw new TransformException(String.format(JoinMessages.BLANK_PROPERTY, propertyName));

@@ -1,8 +1,5 @@
 package io.kestra.plugin.transform.util;
 
-/**
- * Join type of the Join task.
- */
 public enum JoinType {
     INNER,
     FULL_OUTER,

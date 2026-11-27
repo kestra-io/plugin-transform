@@ -16,20 +16,9 @@ import io.kestra.plugin.transform.util.TransformException;
 import java.util.Comparator;
 import java.util.List;
 
-/**
- * Sorted Merge Join implementation.
- * Both inputs are held in memory and sorted on the key.
- */
+/** Both inputs are held in memory and sorted on the key. */
 public class SortedMergeJoin extends AbstractJoinImplementation {
 
-    /**
-     * Creates a new SortedMergeJoin.
-     * @param ioHandler JoinIOHandler instance.
-     * @param leftKey Join key of left input.
-     * @param rightKey Join key of right input.
-     * @param joinType Join type.
-     * @param onlyFirstMatchOnSemi Option to keep only the first match in the output on semi joins.
-     */
     public SortedMergeJoin(
         JoinIOHandler ioHandler,
         JoinKey leftKey,
@@ -40,7 +29,6 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
         super(ioHandler, leftKey, rightKey, joinType, onlyFirstMatchOnSemi);
     }
 
-    /** {@inheritDoc} */
     @Override
     public void join() throws TransformException {
         var sortedLeft = leftKey.index(ioHandler.getInputReader(JoinSide.LEFT));
@@ -56,12 +44,6 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
         mergeLoop(sortedLeft, sortedRight);
     }
 
-    /**
-     * Merge stage for sorted merge join: loop over sorted inputs to search matches (and writing results).
-     * @param sortedLeft Sorted rows from left input.
-     * @param sortedRight Sorted rows from right input.
-     * @throws TransformException If a row cannot be written.
-     */
     private void mergeLoop(List<KeyedRow> sortedLeft, List<KeyedRow> sortedRight) throws TransformException {
         var l = 0;
         var r = 0;
@@ -105,7 +87,6 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
                 continue;
             }
 
-            // True match
             for (var i = l0; i < l; i++) {
                 var leftRow = sortedLeft.get(i);
                 for (var j = r0; j < r; j++) {
@@ -117,17 +98,10 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
             }
         }
 
-        // Remaining non-matching rows from both sides
         emitUnmatched(sortedLeft.subList(l, leftSize), JoinSide.LEFT);
         emitUnmatched(sortedRight.subList(r, rightSize), JoinSide.RIGHT);
     }
 
-    /**
-     * Checks that all non-null key values of both inputs have the same type.
-     * @param left Rows from left input.
-     * @param right Rows from right input.
-     * @throws TransformException If two key values have different types.
-     */
     private void checkSameKeyType(List<KeyedRow> left, List<KeyedRow> right) throws TransformException {
         IonValue reference = null;
         for (var rows : List.of(left, right)) {
@@ -145,13 +119,7 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
         }
     }
 
-    /**
-     * Compares two Ion values based on their type and return an integer representing their order relationship (Comparator pattern).
-     * Null values are sorted last. Values must have the same processable type (see {@link #checkSameKeyType}).
-     * @param va The Ion value to compares to.
-     * @param vb The Ion value to be compared.
-     * @return A negative value if the first value is lesser than the second, positive if greater, and 0 if both are equals.
-     */
+    /** Null values are sorted last. Values must have the same type, see {@link #checkSameKeyType}. */
     private static int compareIonValues(IonValue va, IonValue vb) {
         var vaNull = !isJoinable(va);
         var vbNull = !isJoinable(vb);

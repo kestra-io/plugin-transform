@@ -10,22 +10,14 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
- * Wrapper of IonReader that makes it iterable, streaming top-level structs one by one.
- * The underlying reader is consumed by iteration, so an instance can only be iterated once.
- * Closing it closes both the reader and the input stream.
+ * Streams the top-level structs of an Ion input. It can only be iterated once (the reader is consumed),
+ * and closing it also closes the input stream.
  */
 public class IterableIonReader implements Iterable<IonStruct>, AutoCloseable {
 
-    /** Data stream of input. */
     private final InputStream inputStream;
-
-    /** ION reader instance. */
     private final IonReader reader;
 
-    /**
-     * Creates a new IterableIonReader.
-     * @param inputStream Data stream of input, closed with this reader.
-     */
     public IterableIonReader(InputStream inputStream) {
         this.inputStream = inputStream;
         this.reader = IonValueUtils.system().newReader(inputStream);
@@ -53,10 +45,6 @@ public class IterableIonReader implements Iterable<IonStruct>, AutoCloseable {
         };
     }
 
-    /**
-     * Closes the ION reader and the input stream.
-     * @throws IOException If one of them cannot be closed.
-     */
     @Override
     public void close() throws IOException {
         try {

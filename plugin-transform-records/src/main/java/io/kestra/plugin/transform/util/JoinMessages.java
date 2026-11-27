@@ -1,8 +1,5 @@
 package io.kestra.plugin.transform.util;
 
-/**
- * Messages of the Join task for exceptions, logs and testing.
- */
 public final class JoinMessages {
 
     private JoinMessages() {}

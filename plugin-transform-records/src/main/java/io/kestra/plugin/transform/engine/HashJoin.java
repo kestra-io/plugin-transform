@@ -10,20 +10,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-/**
- * Hash Join implementation.
- * The smaller input is held in memory in a hash table, the other input is streamed.
- */
+/** The smaller input is held in memory in a hash table, the other input is streamed. */
 public class HashJoin extends AbstractJoinImplementation {
 
-    /**
-     * Creates a new HashJoin.
-     * @param ioHandler JoinIOHandler instance.
-     * @param leftKey Join key of left input.
-     * @param rightKey Join key of right input.
-     * @param joinType Join type.
-     * @param onlyFirstMatchOnSemi Option to keep only the first match in the output on semi joins.
-     */
     public HashJoin(
         JoinIOHandler ioHandler,
         JoinKey leftKey,
@@ -34,7 +23,6 @@ public class HashJoin extends AbstractJoinImplementation {
         super(ioHandler, leftKey, rightKey, joinType, onlyFirstMatchOnSemi);
     }
 
-    /** {@inheritDoc} */
     @Override
     public void join() throws TransformException {
         var tableSide = getTableSide();
@@ -55,7 +43,6 @@ public class HashJoin extends AbstractJoinImplementation {
             var keyValue = probeKey.extractKeyValue(probeRow);
             var currentMatches = isJoinable(keyValue) ? hashTable.get(keyValue) : null;
 
-            // Writes mismatched row of probe side for outer and anti joins
             if (currentMatches == null) {
                 if (keepsUnmatched(probeSide)) {
                     ioHandler.writeSideRow(probeRow, probeSide);
@@ -63,7 +50,6 @@ public class HashJoin extends AbstractJoinImplementation {
                 continue;
             }
 
-            // Writes all matched rows in hash table for current row of probe side
             var probeMatched = false;
             for (var tableRow : currentMatches) {
                 if (tableSide == JoinSide.LEFT) {
@@ -80,10 +66,6 @@ public class HashJoin extends AbstractJoinImplementation {
         emitUnmatched(tableRows, tableSide);
     }
 
-    /**
-     * Get the side of the best input to build the hash table for hash join (i.e. the smaller).
-     * @return The side (left or right).
-     */
     private JoinSide getTableSide() {
         var leftSize = ioHandler.getInputCount(JoinSide.LEFT);
         var rightSize = ioHandler.getInputCount(JoinSide.RIGHT);

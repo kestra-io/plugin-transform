@@ -16,12 +16,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Abstraction of join key providing a data structure for nested fields, side and method for extraction.
- */
 public final class JoinKey {
 
-    /** ION types of key values that can be processed. */
     private static final Set<IonType> PROCESSABLE_TYPES = EnumSet.of(
         IonType.BOOL,
         IonType.DECIMAL,
@@ -31,34 +27,15 @@ public final class JoinKey {
         IonType.TIMESTAMP
     );
 
-    /** String of the key used as input, which can be the field name or a nested key path. */
     private final String keyString;
-
-    /** Side of the key. */
     private final JoinSide keySide;
-
-    /**
-     * Path of the key.
-     * Each item is a field name forming the path of nested key.
-     */
     private final List<String> keyPath;
-
-    /** Action when key is missing. */
     private final MissingKeyAction onMissingKey;
-
-    /** JoinIOHandler instance. */
     private final JoinIOHandler ioHandler;
 
-    /** If key is missing in at least one row. */
+    // True once a missing key has been reported, so that the warning is logged only once.
     private boolean isMissing = false;
 
-    /**
-     * Creates a new JoinKey.
-     * @param keyString String of the key used as input, which can be the field name or a nested key path.
-     * @param keySide Side of the key.
-     * @param onMissingKey Action when key is missing.
-     * @param ioHandler JoinIOHandler instance.
-     */
     public JoinKey(String keyString,
         JoinSide keySide,
         MissingKeyAction onMissingKey,
@@ -69,34 +46,19 @@ public final class JoinKey {
         this.onMissingKey = onMissingKey;
         this.ioHandler = ioHandler;
 
-        // Split of key string with . character used as separator for nested key path.
         this.keyPath = Arrays.stream(keyString.split("\\.")).map(String::trim).toList();
     }
 
-    /**
-     * Get the key string.
-     * @return String of the key used as input, which can be the field name or a nested key path.
-     */
     public String getKeyString() {
         return keyString;
     }
 
-    /**
-     * Extracts value from a row by unique or nested key.
-     * @param row The row where to extracts the value.
-     * @return The corresponding Ion value, null or Ion null when the key is missing and not failing.
-     * @throws TransformException If the key is missing (FAIL action), unreachable, or has an unprocessable value.
-     */
+    /** Returns null or Ion null when the key is missing and the missing key action does not fail. */
     public IonValue extractKeyValue(IonStruct row) throws TransformException {
         return traverseRow(row, 0);
     }
 
-    /**
-     * Extracts the key value of each row, once.
-     * @param rows The rows of an input.
-     * @return A mutable list of keyed rows, in input order.
-     * @throws TransformException If a key value cannot be extracted.
-     */
+    /** Returns a mutable list, in input order, so that it can be sorted in place. */
     public List<KeyedRow> index(Iterable<IonStruct> rows) throws TransformException {
         var keyedRows = new ArrayList<KeyedRow>();
         for (var row : rows) {
@@ -105,13 +67,6 @@ public final class JoinKey {
         return keyedRows;
     }
 
-    /**
-     * Recursive function to get the key value in a simple or nested row.
-     * @param row The row where to extracts the value.
-     * @param depth Current depth of the traversing.
-     * @return The final Ion value.
-     * @throws TransformException If the value cannot be extracted.
-     */
     private IonValue traverseRow(IonStruct row, int depth) throws TransformException {
         var val = row.get(keyPath.get(depth));
         if (depth < keyPath.size() - 1) {
@@ -133,11 +88,6 @@ public final class JoinKey {
         return val;
     }
 
-    /**
-     * Applies the missing key action. A warning is logged only for the first missing key.
-     * @param row The row where the key is missing.
-     * @throws TransformException If the action is FAIL.
-     */
     private void handleMissingKey(IonStruct row) throws TransformException {
         var message = String.format(JoinMessages.MISSING_KEY, keyString, keySide, row);
         switch (onMissingKey) {
@@ -150,10 +100,6 @@ public final class JoinKey {
         }
     }
 
-    /**
-     * Logs a warning if no key was missing before.
-     * @param message The warning message.
-     */
     private void warnOnce(String message) {
         if (!isMissing) {
             ioHandler.warn(message);
