@@ -1375,7 +1375,7 @@ class JoinTest {
     }
 
     /**
-     * Test of keys from where marked depth (with .) doesn't match an existent object depth in data.
+     * Test of nested keys (with .) whose parent value exists but is not an object.
      * Should throw a specific error.
      */
     @Test
@@ -1400,6 +1400,54 @@ class JoinTest {
                     assertThat("Should show specific error for " + testEntry.getKey() + " invalid key" + describe(joinImplementation, joinType),
                         exception.getMessage(), equalTo(expectedError));
                 }
+            }
+        }
+    }
+
+    /**
+     * Tests that a row whose parent object of a nested key is absent or null is handled as a missing key,
+     * according to the onMissingKey option, instead of failing as an unreachable key depth.
+     */
+    @Test
+    void missingNestedKeyParentFollowsOnMissingKey() throws Exception {
+
+        String leftContent = """
+            {customer:{id:1},leftValue:"L1"}
+            {leftValue:"L2"}
+            {customer:null,leftValue:"L3"}""";
+
+        String rightContent = """
+            {customer:{id:1},rightValue:"R1"}""";
+
+        String nestedKey = "customer.id";
+
+        String expected = """
+            {customer:{id:1},leftValue:"L1",rightValue:"R1"}""";
+
+        String expectedErrorPattern = String.format(JoinMessages.MISSING_KEY, nestedKey, "LEFT", ".*");
+
+        Map<MissingKeyAction, Optional<State.Type>> expectedStates =
+            Map.of(
+                MissingKeyAction.WARNING, Optional.of(State.Type.WARNING),
+                MissingKeyAction.IGNORE, Optional.empty()
+            );
+
+        RunContext runContext = getRunContext(leftContent, rightContent);
+
+        for (JoinImplementation joinImplementation : JoinImplementation.values()) {
+            Exception exception = assertThrows(Exception.class,
+                () -> getOutput(runContext, joinImplementation, JoinType.INNER, nestedKey, nestedKey, MissingKeyAction.FAIL));
+
+            assertThat("Missing parent should fail as a missing key with FAIL" + describe(joinImplementation, JoinType.INNER),
+                exception.getMessage(), matchesPattern(expectedErrorPattern));
+
+            for (var testEntry : expectedStates.entrySet()) {
+                Join.Output runOutput = getOutput(runContext, joinImplementation, JoinType.INNER, nestedKey, nestedKey, testEntry.getKey());
+
+                assertThat("Final state with " + testEntry.getKey() + " on missing parent" + describe(joinImplementation, JoinType.INNER),
+                    runOutput.finalState(), equalTo(testEntry.getValue()));
+                assertThat("Rows with a missing parent should not match with " + testEntry.getKey() + describe(joinImplementation, JoinType.INNER),
+                    sortIonLines(readOutput(runOutput)), equalTo(sortIonLines(expected)));
             }
         }
     }

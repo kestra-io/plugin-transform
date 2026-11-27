@@ -71,7 +71,12 @@ public final class JoinKey {
     private IonValue traverseRow(IonStruct row, int depth) throws TransformException {
         var val = row.get(keyPath.get(depth));
         if (depth < keyPath.size() - 1) {
-            if (val != null && val.getType() == IonType.STRUCT) {
+            // An absent or null parent object makes the key missing; only a non-object parent is an error.
+            if (IonValueUtils.isNull(val)) {
+                handleMissingKey(row);
+                return null;
+            }
+            if (val.getType() == IonType.STRUCT) {
                 return traverseRow((IonStruct) val, depth + 1);
             }
             throw new TransformException(String.format(JoinMessages.UNREACHABLE_KEY_DEPTH, keyString, keySide));
