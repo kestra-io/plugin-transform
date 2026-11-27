@@ -53,9 +53,10 @@ public final class JoinKey {
         return keyString;
     }
 
-    /** Returns null or Ion null when the key is missing and the missing key action does not fail. */
-    public IonValue extractKeyValue(IonStruct row) throws TransformException {
-        return traverseRow(row, 0);
+    /** Returns null when the key is missing and the missing key action does not fail. */
+    public JoinKeyValue extractKeyValue(IonStruct row) throws TransformException {
+        var value = traverseRow(row, 0);
+        return IonValueUtils.isNull(value) ? null : JoinKeyValue.of(value);
     }
 
     /** Returns a mutable list, in input order, so that it can be sorted in place. */

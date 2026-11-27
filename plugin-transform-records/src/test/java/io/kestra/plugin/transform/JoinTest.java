@@ -1661,4 +1661,52 @@ class JoinTest {
                 sortIonLines(readOutput(runOutput)), equalTo(expected));
         }
     }
+
+    /**
+     * Tests that every implementation matches decimal keys by value and timestamp keys by instant.
+     * Regression test: hash and nested loop joins used to compare keys with IonValue.equals,
+     * which depends on decimal precision and timestamp offset, unlike sorted merge.
+     * With the default OVERWRITE merge mode, the output keeps the right key.
+     */
+    @Test
+    void decimalAndTimestampKeysMatchInEveryImplementation() throws Exception {
+
+        Map<String, String[]> contentsByKeyType =
+            Map.of(
+                "decimal", new String[] {
+                    """
+                    {id:1.0,leftValue:"L1"}
+                    {id:2.50,leftValue:"L2"}""",
+                    """
+                    {id:1.00,rightValue:"R1"}
+                    {id:2.5,rightValue:"R2"}""",
+                    """
+                    {id:1.00,leftValue:"L1",rightValue:"R1"}
+                    {id:2.5,leftValue:"L2",rightValue:"R2"}"""
+                },
+                "timestamp", new String[] {
+                    """
+                    {id:2024-01-01T00:00Z,leftValue:"L1"}
+                    {id:2024-01-02T,leftValue:"L2"}""",
+                    """
+                    {id:2024-01-01T01:00+01:00,rightValue:"R1"}
+                    {id:2024-01-02T00:00:00.000Z,rightValue:"R2"}""",
+                    """
+                    {id:2024-01-01T01:00+01:00,leftValue:"L1",rightValue:"R1"}
+                    {id:2024-01-02T00:00:00.000Z,leftValue:"L2",rightValue:"R2"}"""
+                }
+            );
+
+        for (var testEntry : contentsByKeyType.entrySet()) {
+            RunContext runContext = getRunContext(testEntry.getValue()[0], testEntry.getValue()[1]);
+            String expected = sortIonLines(testEntry.getValue()[2]);
+
+            for (JoinImplementation joinImplementation : JoinImplementation.values()) {
+                Join.Output runOutput = getOutput(runContext, joinImplementation, JoinType.INNER);
+
+                assertThat("Equal " + testEntry.getKey() + " keys should match" + describe(joinImplementation, JoinType.INNER),
+                    sortIonLines(readOutput(runOutput)), equalTo(expected));
+            }
+        }
+    }
 }

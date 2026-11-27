@@ -50,7 +50,7 @@ This is a **multi-module** plugin with 4 submodules:
 
 `Join` joins two inputs on a key (inner, outer, anti and semi joins). Its classes are spread over the shared packages of `io.kestra.plugin.transform`:
 
-- `engine`: join implementations (`AbstractJoinImplementation`, `HashJoin`, `NestedLoopJoin`, `SortedMergeJoin`), `JoinKey`, `KeyedRow`
+- `engine`: join implementations (`AbstractJoinImplementation`, `HashJoin`, `NestedLoopJoin`, `SortedMergeJoin`), `JoinKey`, `JoinKeyValue` (key value compared the same way by every implementation), `KeyedRow`
 - `util`: property enums (`JoinType`, `JoinImplementation`, `MergeMode`, `MissingKeyAction`), `JoinSide`, `JoinMessages`, and `JoinIOHandler` (input reading and output writing through the run context)
 - `ion`: `IterableIonReader` (streams a stored Ion file)
 

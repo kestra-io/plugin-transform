@@ -1,19 +1,18 @@
 package io.kestra.plugin.transform.engine;
 
 import com.amazon.ion.IonStruct;
-import com.amazon.ion.IonValue;
 
 /** Input row held in memory, with its key extracted once and whether it matched a row of the other side. */
 public final class KeyedRow {
 
     private final IonStruct row;
 
-    // Null or Ion null when the key is missing.
-    private final IonValue key;
+    // Null when the key is missing.
+    private final JoinKeyValue key;
 
     private boolean matched = false;
 
-    public KeyedRow(IonStruct row, IonValue key) {
+    public KeyedRow(IonStruct row, JoinKeyValue key) {
         this.row = row;
         this.key = key;
     }
@@ -22,7 +21,7 @@ public final class KeyedRow {
         return row;
     }
 
-    public IonValue getKey() {
+    public JoinKeyValue getKey() {
         return key;
     }
 

@@ -45,7 +45,9 @@ import java.util.Optional;
 @NoArgsConstructor
 @Schema(
     title = "Join two record sets on a key",
-    description = "Apply inner, outer, anti or semi joins on two inputs (records or Ion files), matching rows whose key values are equal."
+    description = """
+        Apply inner, outer, anti or semi joins on two inputs (records or Ion files), matching rows whose key values are equal.
+        Keys of different types never match; decimals are compared by value (`1.0` equals `1.00`) and timestamps by instant, whatever their offset or precision."""
 )
 @Plugin(
     examples = {

@@ -1,8 +1,6 @@
 package io.kestra.plugin.transform.engine;
 
 import com.amazon.ion.IonStruct;
-import com.amazon.ion.IonValue;
-import io.kestra.plugin.transform.ion.IonValueUtils;
 import io.kestra.plugin.transform.util.JoinIOHandler;
 import io.kestra.plugin.transform.util.JoinImplementation;
 import io.kestra.plugin.transform.util.JoinSide;
@@ -56,8 +54,8 @@ public abstract class AbstractJoinImplementation {
     }
 
     /** A missing or null key never matches. */
-    protected static boolean isJoinable(IonValue key) {
-        return !IonValueUtils.isNull(key);
+    protected static boolean isJoinable(JoinKeyValue key) {
+        return key != null;
     }
 
     protected boolean keepsUnmatched(JoinSide side) {

@@ -1,6 +1,5 @@
 package io.kestra.plugin.transform.engine;
 
-import com.amazon.ion.IonValue;
 import io.kestra.plugin.transform.util.JoinIOHandler;
 import io.kestra.plugin.transform.util.JoinSide;
 import io.kestra.plugin.transform.util.JoinType;
@@ -30,7 +29,7 @@ public class HashJoin extends AbstractJoinImplementation {
 
         // Build stage: hash table from the smaller input.
         var tableRows = keyOf(tableSide).index(ioHandler.getInputReader(tableSide));
-        var hashTable = new HashMap<IonValue, List<KeyedRow>>();
+        var hashTable = new HashMap<JoinKeyValue, List<KeyedRow>>();
         for (var tableRow : tableRows) {
             if (isJoinable(tableRow.getKey())) {
                 hashTable.computeIfAbsent(tableRow.getKey(), k -> new ArrayList<>()).add(tableRow);

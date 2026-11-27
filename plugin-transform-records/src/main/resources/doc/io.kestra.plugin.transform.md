@@ -138,6 +138,7 @@ Use the shared expression language for per-record transforms and conditions. Use
 ## Join
 
 `Join` matches the rows of two inputs, `left` and `right`, whose key values are equal, the way you would join two tables in SQL.\
+Keys of different types never match; decimals are compared by value (`1.0` equals `1.00`) and timestamps by instant, whatever their offset or precision.\
 Each input can be a list of records or a stored Ion file URI, and the common `outputType` and `outputFormat` options apply.\
 Besides `uri` or `records`, the task outputs the row counts `outputSize`, `leftSize` and `rightSize`.
 

@@ -1,12 +1,5 @@
 package io.kestra.plugin.transform.engine;
 
-import com.amazon.ion.IonBool;
-import com.amazon.ion.IonDecimal;
-import com.amazon.ion.IonFloat;
-import com.amazon.ion.IonInt;
-import com.amazon.ion.IonString;
-import com.amazon.ion.IonTimestamp;
-import com.amazon.ion.IonValue;
 import io.kestra.plugin.transform.util.JoinIOHandler;
 import io.kestra.plugin.transform.util.JoinMessages;
 import io.kestra.plugin.transform.util.JoinSide;
@@ -18,6 +11,9 @@ import java.util.List;
 
 /** Both inputs are held in memory and sorted on the key. */
 public class SortedMergeJoin extends AbstractJoinImplementation {
+
+    // Null (missing) keys are sorted last. Keys must have the same type, see checkSameKeyType.
+    private static final Comparator<JoinKeyValue> KEY_ORDER = Comparator.nullsLast(Comparator.naturalOrder());
 
     public SortedMergeJoin(
         JoinIOHandler ioHandler,
@@ -37,7 +33,7 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
         // Checked before sorting, so that the comparator cannot fail.
         checkSameKeyType(sortedLeft, sortedRight);
 
-        Comparator<KeyedRow> byKey = (a, b) -> compareIonValues(a.getKey(), b.getKey());
+        Comparator<KeyedRow> byKey = Comparator.comparing(KeyedRow::getKey, KEY_ORDER);
         sortedLeft.sort(byKey);
         sortedRight.sort(byKey);
 
@@ -54,7 +50,7 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
             var leftValue = sortedLeft.get(l).getKey();
             var rightValue = sortedRight.get(r).getKey();
 
-            var leftToRightCompare = compareIonValues(leftValue, rightValue);
+            var leftToRightCompare = KEY_ORDER.compare(leftValue, rightValue);
 
             // Mismatch from Left
             if (leftToRightCompare < 0) {
@@ -77,8 +73,8 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
             // Equality means a match (except for null values): find the groups of equal keys on both sides
             var l0 = l;
             var r0 = r;
-            while (l < leftSize && compareIonValues(leftValue, sortedLeft.get(l).getKey()) == 0) l++;
-            while (r < rightSize && compareIonValues(rightValue, sortedRight.get(r).getKey()) == 0) r++;
+            while (l < leftSize && KEY_ORDER.compare(leftValue, sortedLeft.get(l).getKey()) == 0) l++;
+            while (r < rightSize && KEY_ORDER.compare(rightValue, sortedRight.get(r).getKey()) == 0) r++;
 
             // Forced mismatch for null values on both sides
             if (!isJoinable(leftValue)) {
@@ -103,7 +99,7 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
     }
 
     private void checkSameKeyType(List<KeyedRow> left, List<KeyedRow> right) throws TransformException {
-        IonValue reference = null;
+        JoinKeyValue reference = null;
         for (var rows : List.of(left, right)) {
             for (var row : rows) {
                 var key = row.getKey();
@@ -117,28 +113,5 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
                 }
             }
         }
-    }
-
-    /** Null values are sorted last. Values must have the same type, see {@link #checkSameKeyType}. */
-    private static int compareIonValues(IonValue va, IonValue vb) {
-        var vaNull = !isJoinable(va);
-        var vbNull = !isJoinable(vb);
-        if (vaNull && vbNull) return 0;
-        if (vaNull) return 1;
-        if (vbNull) return -1;
-
-        if (va.getType() != vb.getType()) {
-            throw new IllegalStateException(String.format(JoinMessages.DIFFERENT_TYPES, va, vb));
-        }
-
-        return switch (va.getType()) {
-            case BOOL -> Boolean.compare(((IonBool) va).booleanValue(), ((IonBool) vb).booleanValue());
-            case INT -> ((IonInt) va).bigIntegerValue().compareTo(((IonInt) vb).bigIntegerValue());
-            case FLOAT -> Double.compare(((IonFloat) va).doubleValue(), ((IonFloat) vb).doubleValue());
-            case DECIMAL -> ((IonDecimal) va).decimalValue().compareTo(((IonDecimal) vb).decimalValue());
-            case STRING -> ((IonString) va).stringValue().compareTo(((IonString) vb).stringValue());
-            case TIMESTAMP -> ((IonTimestamp) va).timestampValue().compareTo(((IonTimestamp) vb).timestampValue());
-            default -> throw new IllegalStateException(JoinMessages.UNPROCESSABLE_COMPARED_TYPES);
-        };
     }
 }
