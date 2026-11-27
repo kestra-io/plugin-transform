@@ -212,11 +212,6 @@ subprojects { Project subproject ->
                     name  = "Ludovic Dehon"
                     email = "ldehon@kestra.io"
                 }
-                developer {
-                    id           = "scyanth"
-                    name         = "Martin Beck"
-                    organization = "IUT TLSE3"
-                }
             }
             scm {
                 connection = 'scm:git:'
