@@ -161,11 +161,15 @@ Output row order may also vary depending on this.
 
 Available implementations:
 
-- **hash (default)**: only the smaller input is held in memory, in a hash table; the other input is streamed.
-- nested loop: the right input is held in memory and compared with every row of the streamed left input; only suited to small inputs.
+- **hash (default)**: only one input is held in memory, in a hash table; the other input is streamed. The task chooses an input given as records, as it is already in memory, otherwise the smaller stored file.
+- nested loop: the right input is held in memory and compared with every row of the streamed left input, so the run time grows with the product of the input sizes; only suited to small inputs.
 - sorted merge: both inputs are held in memory to be sorted on the key.
 
 When an input is given as records rather than a stored file, it is already in memory, whatever the implementation.
+
+The task sets no memory limit: an input held in memory must fit in the memory of the worker. With large inputs:
+- prefer the hash implementation, which holds only one input in memory;
+- reduce the inputs before the join: drop the rows you do not need with `Filter`, and keep only the fields you need with `Map`.
 
 ### Merge mode
 

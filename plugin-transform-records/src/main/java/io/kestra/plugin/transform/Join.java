@@ -202,8 +202,9 @@ public class Join extends Task implements RunnableTask<Join.Output> {
         title = "Join implementation (algorithm)",
         description = """
             All implementations return the same rows, possibly in a different order.
-            - `HASH` (default): builds a hash table from the smaller input, then streams the other input to find matches. Only the smaller input is held in memory.
-            - `NESTED_LOOP`: compares every row of one input with every row of the other; only suited to small inputs. The right input is held in memory.
+            The task sets no memory limit: an input held in memory must fit in the memory of the worker.
+            - `HASH` (default): builds a hash table from one input, then streams the other input to find matches. Only the input of the hash table is held in memory: an input given as records, otherwise the smaller stored file. Suited to large inputs.
+            - `NESTED_LOOP`: compares every row of the left input with every row of the right input, so its run time grows with the product of the input sizes; only suited to small inputs. The right input is held in memory.
             - `SORTED_MERGE`: sorts both inputs on the key, then merges them; the key must have the same type in every row of both inputs. Both inputs are held in memory."""
     )
     @PluginProperty(group = "processing")

@@ -28,6 +28,8 @@ flowchart TD
 ```
 #### Performance
 **The worst of the three, except for very small datasets (10 rows or less).**
+#### Memory
+The right input is held in memory; the left input is streamed.
 #### Complexity
 **O(n * m)**
 #### References
@@ -63,9 +65,11 @@ flowchart TD
     NextS -- Yes --> ReadS
     NextS -- No --> End
 ```
-*Note: among the different existing subtypes, the Join task uses the classic (aka in-memory) hash join: the hash table is built from the smaller input, held in memory, and the other input is streamed.*
+*Note: among the different existing subtypes, the Join task uses the classic (aka in-memory) hash join: the hash table is held in memory, and the other input is streamed.*
 #### Performance
 **Fast with large datasets.**
+#### Memory
+Only the input of the hash table is held in memory: an input given as records, as it is already in memory, otherwise the smaller stored file.
 #### Complexity
 **O(n + m)**
 #### References
@@ -104,6 +108,8 @@ flowchart TD
 ```
 #### Performance
 **The best of the three if datasets are already sorted (because sorting is the longest step). If not, performance is similar or slightly lower than hash join.**
+#### Memory
+Both inputs are held in memory to be sorted.
 #### Complexity
 **O(n log n + m log m)** or **O(n + m)** (according to sorting of inputs)
 #### References

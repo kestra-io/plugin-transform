@@ -59,7 +59,7 @@ Join-specific rules:
 - Keep the `leftSize`, `rightSize` and `outputSize` outputs; metrics may only be added on top of them.
 - `leftLabel`, `rightLabel` and `prefixSeparator` are dynamic properties; labels are checked (not blank, distinct) at run time, and the separator may be empty.
 - Join keys are split on `.`, not evaluated with the shared expression language.
-- `HASH` must keep streaming the larger input; only the smaller one is held in memory.
+- `HASH` must hold only one input in memory and stream the other: an input given as records (already in memory), otherwise the smaller stored file. A stored file is never loaded in memory when the other input already is.
 
 ### Project Structure
 
