@@ -45,6 +45,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.hamcrest.Matchers.notNullValue;
 
 @KestraTest
 class JoinTest {
@@ -576,6 +577,31 @@ class JoinTest {
                 }
             }
         }
+    }
+
+    /**
+     * Tests that optional properties rendering to nothing fall back to their default values instead of failing.
+     */
+    @Test
+    void emptyOptionalPropertiesFallBackToDefaults() throws Exception {
+
+        RunContext runContext = getRunContext(defaultLeftContent, defaultRightContent);
+
+        Join task = taskBuilder(defaultKey, defaultKey)
+            .joinImplementation(null)
+            .joinType(null)
+            .mergeMode(null)
+            .onlyFirstMatchOnSemi(null)
+            .onMissingKey(null)
+            .outputFormat(null)
+            .outputType(null)
+            .build();
+
+        Join.Output runOutput = task.run(runContext);
+
+        assertThat("Inputs from storage should give a stored output by default", runOutput.getUri(), notNullValue());
+        assertThat("Result should be the one of the default join type and merge mode",
+            sortIonLines(readOutput(runOutput)), equalTo(sortIonLines(defaultExpectedResults.get(JoinType.INNER))));
     }
 
     /**

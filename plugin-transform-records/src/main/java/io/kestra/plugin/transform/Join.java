@@ -156,6 +156,15 @@ import java.util.Optional;
 )
 public class Join extends Task implements RunnableTask<Join.Output> {
 
+    // Used as builder defaults, and when a property renders to nothing.
+    private static final JoinImplementation DEFAULT_JOIN_IMPLEMENTATION = JoinImplementation.HASH;
+    private static final JoinType DEFAULT_JOIN_TYPE = JoinType.INNER;
+    private static final MergeMode DEFAULT_MERGE_MODE = MergeMode.OVERWRITE;
+    private static final boolean DEFAULT_ONLY_FIRST_MATCH_ON_SEMI = false;
+    private static final MissingKeyAction DEFAULT_ON_MISSING_KEY = MissingKeyAction.FAIL;
+    private static final OutputFormat DEFAULT_OUTPUT_FORMAT = OutputFormat.TEXT;
+    private static final OutputMode DEFAULT_OUTPUT_TYPE = OutputMode.AUTO;
+
     @Schema(
         title = "Left data",
         description = "Records (list or single record), Ion values, or a `kestra://` internal storage URI of an Ion file."
@@ -198,7 +207,7 @@ public class Join extends Task implements RunnableTask<Join.Output> {
     )
     @PluginProperty(group = "processing")
     @Builder.Default
-    private Property<JoinImplementation> joinImplementation = Property.ofValue(JoinImplementation.HASH);
+    private Property<JoinImplementation> joinImplementation = Property.ofValue(DEFAULT_JOIN_IMPLEMENTATION);
 
     @Schema(
         title = "Join type",
@@ -210,7 +219,7 @@ public class Join extends Task implements RunnableTask<Join.Output> {
     )
     @PluginProperty(group = "main")
     @Builder.Default
-    private Property<JoinType> joinType = Property.ofValue(JoinType.INNER);
+    private Property<JoinType> joinType = Property.ofValue(DEFAULT_JOIN_TYPE);
 
     @Schema(
         title = "Merge mode",
@@ -222,7 +231,7 @@ public class Join extends Task implements RunnableTask<Join.Output> {
     )
     @PluginProperty(group = "destination")
     @Builder.Default
-    private Property<MergeMode> mergeMode = Property.ofValue(MergeMode.OVERWRITE);
+    private Property<MergeMode> mergeMode = Property.ofValue(DEFAULT_MERGE_MODE);
 
     @Schema(
         title = "Label for left fields in output",
@@ -256,7 +265,7 @@ public class Join extends Task implements RunnableTask<Join.Output> {
     )
     @PluginProperty(group = "processing")
     @Builder.Default
-    private Property<Boolean> onlyFirstMatchOnSemi = Property.ofValue(false);
+    private Property<Boolean> onlyFirstMatchOnSemi = Property.ofValue(DEFAULT_ONLY_FIRST_MATCH_ON_SEMI);
 
     @Schema(
         title = "What to do when key field is missing from an input (for at least one row)",
@@ -267,7 +276,7 @@ public class Join extends Task implements RunnableTask<Join.Output> {
     )
     @PluginProperty(group = "reliability")
     @Builder.Default
-    private Property<MissingKeyAction> onMissingKey = Property.ofValue(MissingKeyAction.FAIL);
+    private Property<MissingKeyAction> onMissingKey = Property.ofValue(DEFAULT_ON_MISSING_KEY);
 
     @Schema(
         title = "Output format",
@@ -277,7 +286,7 @@ public class Join extends Task implements RunnableTask<Join.Output> {
     )
     @PluginProperty(group = "destination")
     @Builder.Default
-    private Property<OutputFormat> outputFormat = Property.ofValue(OutputFormat.TEXT);
+    private Property<OutputFormat> outputFormat = Property.ofValue(DEFAULT_OUTPUT_FORMAT);
 
     @Schema(
         title = "Output type",
@@ -287,7 +296,7 @@ public class Join extends Task implements RunnableTask<Join.Output> {
     )
     @PluginProperty(group = "destination")
     @Builder.Default
-    private Property<OutputMode> outputType = Property.ofValue(OutputMode.AUTO);
+    private Property<OutputMode> outputType = Property.ofValue(DEFAULT_OUTPUT_TYPE);
 
     @Schema(hidden = true)
     @JsonIgnore
@@ -299,15 +308,22 @@ public class Join extends Task implements RunnableTask<Join.Output> {
 
     @Override
     public Join.Output run(RunContext runContext) throws Exception {
-        var rLeftKey = requireNonBlank(render(leftKey, String.class, "leftKey", runContext), "leftKey");
-        var rRightKey = requireNonBlank(render(rightKey, String.class, "rightKey", runContext), "rightKey");
-        var rJoinImplementation = render(joinImplementation, JoinImplementation.class, "joinImplementation", runContext);
-        var rJoinType = render(joinType, JoinType.class, "joinType", runContext);
-        var rMergeMode = render(mergeMode, MergeMode.class, "mergeMode", runContext);
-        var rOnlyFirstMatchOnSemi = render(onlyFirstMatchOnSemi, Boolean.class, "onlyFirstMatchOnSemi", runContext);
-        var rOnMissingKey = render(onMissingKey, MissingKeyAction.class, "onMissingKey", runContext);
-        var rOutputFormat = render(outputFormat, OutputFormat.class, "outputFormat", runContext);
-        var rOutputType = render(outputType, OutputMode.class, "outputType", runContext);
+        var rLeftKey = renderNonBlank(leftKey, "leftKey", runContext);
+        var rRightKey = renderNonBlank(rightKey, "rightKey", runContext);
+        var rJoinImplementation = render(joinImplementation, JoinImplementation.class, "joinImplementation", runContext)
+            .orElse(DEFAULT_JOIN_IMPLEMENTATION);
+        var rJoinType = render(joinType, JoinType.class, "joinType", runContext)
+            .orElse(DEFAULT_JOIN_TYPE);
+        var rMergeMode = render(mergeMode, MergeMode.class, "mergeMode", runContext)
+            .orElse(DEFAULT_MERGE_MODE);
+        var rOnlyFirstMatchOnSemi = render(onlyFirstMatchOnSemi, Boolean.class, "onlyFirstMatchOnSemi", runContext)
+            .orElse(DEFAULT_ONLY_FIRST_MATCH_ON_SEMI);
+        var rOnMissingKey = render(onMissingKey, MissingKeyAction.class, "onMissingKey", runContext)
+            .orElse(DEFAULT_ON_MISSING_KEY);
+        var rOutputFormat = render(outputFormat, OutputFormat.class, "outputFormat", runContext)
+            .orElse(DEFAULT_OUTPUT_FORMAT);
+        var rOutputType = render(outputType, OutputMode.class, "outputType", runContext)
+            .orElse(DEFAULT_OUTPUT_TYPE);
 
         var rLeft = resolveInput(left, "left", runContext);
         var rRight = resolveInput(right, "right", runContext);
@@ -352,19 +368,26 @@ public class Join extends Task implements RunnableTask<Join.Output> {
         }
     }
 
-    /** A property that renders to nothing is an error, never silently replaced by a default value. */
-    private <T> T render(
+    private <T> Optional<T> render(
         Property<T> property,
         Class<T> type,
         String propertyName,
         RunContext runContext) throws TransformException {
-        Optional<T> rendered;
         try {
-            rendered = runContext.render(property).as(type);
+            return runContext.render(property).as(type);
         } catch (Exception e) {
             throw new TransformException(String.format(JoinMessages.RENDER_ERROR, propertyName), e);
         }
-        return rendered.orElseThrow(() -> new TransformException(String.format(JoinMessages.BLANK_PROPERTY, propertyName)));
+    }
+
+    /** Keys have no default value: a key that renders to nothing or to a blank string is an error. */
+    private String renderNonBlank(
+        Property<String> property,
+        String propertyName,
+        RunContext runContext) throws TransformException {
+        return render(property, String.class, propertyName, runContext)
+            .filter(value -> !value.isBlank())
+            .orElseThrow(() -> new TransformException(String.format(JoinMessages.BLANK_PROPERTY, propertyName)));
     }
 
     private TransformTaskSupport.ResolvedInput resolveInput(
@@ -381,13 +404,6 @@ public class Join extends Task implements RunnableTask<Join.Output> {
             throw new TransformException(String.format(JoinMessages.BLANK_PROPERTY, propertyName));
         }
         return resolved;
-    }
-
-    private String requireNonBlank(String value, String propertyName) throws TransformException {
-        if (value == null || value.isBlank()) {
-            throw new TransformException(String.format(JoinMessages.BLANK_PROPERTY, propertyName));
-        }
-        return value;
     }
 
     public enum OutputMode {
