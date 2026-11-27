@@ -15,12 +15,18 @@ import java.util.NoSuchElementException;
  */
 public class IterableIonReader implements Iterable<IonStruct>, AutoCloseable {
 
+    public static final String NOT_A_STRUCT = "The %s input must contain one Ion struct per row, found %s.";
+
     private final InputStream inputStream;
     private final IonReader reader;
 
-    public IterableIonReader(InputStream inputStream) {
+    // Name of the input in error messages.
+    private final String inputName;
+
+    public IterableIonReader(InputStream inputStream, String inputName) {
         this.inputStream = inputStream;
         this.reader = IonValueUtils.system().newReader(inputStream);
+        this.inputName = inputName;
     }
 
     @Override
@@ -37,6 +43,10 @@ public class IterableIonReader implements Iterable<IonStruct>, AutoCloseable {
             public IonStruct next() {
                 if (nextType == null) {
                     throw new NoSuchElementException();
+                }
+                // Unchecked, because Iterator.next() cannot throw a checked exception.
+                if (nextType != IonType.STRUCT) {
+                    throw new IllegalArgumentException(String.format(NOT_A_STRUCT, inputName, nextType));
                 }
                 var struct = (IonStruct) IonValueUtils.system().newValue(reader);
                 nextType = reader.next();

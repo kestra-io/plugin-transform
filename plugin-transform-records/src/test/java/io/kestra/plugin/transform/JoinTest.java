@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.Test;
 
 import io.kestra.plugin.transform.ion.IonValueUtils;
+import io.kestra.plugin.transform.ion.IterableIonReader;
 import io.kestra.plugin.transform.util.JoinImplementation;
 import io.kestra.plugin.transform.util.JoinType;
 import io.kestra.plugin.transform.util.MergeMode;
@@ -1493,6 +1494,38 @@ class JoinTest {
                     assertThat("Should show specific error for " + testEntry.getKey() + " invalid key" + describe(joinImplementation, joinType),
                         exception.getMessage(), equalTo(expectedError));
                 }
+            }
+        }
+    }
+
+    /**
+     * Tests that a stored input whose top-level values are not structs fails with a message naming the side and the found type.
+     * The message is searched in the whole cause chain, as the error may be wrapped by a read error.
+     */
+    @Test
+    void nonStructRowThrowError() {
+
+        Map<String, String[]> contentsBySide =
+            Map.of(
+                "LEFT", new String[] { "[{id:1}]", defaultRightContent, "LIST" },
+                "RIGHT", new String[] { defaultLeftContent, "42", "INT" }
+            );
+
+        for (var testEntry : contentsBySide.entrySet()) {
+            RunContext runContext = getRunContext(testEntry.getValue()[0], testEntry.getValue()[1]);
+            String expectedError = String.format(IterableIonReader.NOT_A_STRUCT, testEntry.getKey(), testEntry.getValue()[2]);
+
+            for (JoinImplementation joinImplementation : JoinImplementation.values()) {
+                Exception exception = assertThrows(Exception.class,
+                    () -> getOutput(runContext, joinImplementation, JoinType.INNER));
+
+                StringBuilder messages = new StringBuilder();
+                for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+                    messages.append(cause.getMessage()).append('\n');
+                }
+
+                assertThat("Should show specific error for " + testEntry.getKey() + " non-struct row" + describe(joinImplementation, JoinType.INNER),
+                    messages.toString(), containsString(expectedError));
             }
         }
     }

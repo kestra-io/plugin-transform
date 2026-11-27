@@ -111,7 +111,7 @@ public class JoinIOHandler implements AutoCloseable {
         if (inputRecords != null) {
             return inputRecords;
         }
-        var reader = createInputReader(storageUri(side));
+        var reader = createInputReader(side);
         openReaders.add(reader);
         return reader;
     }
@@ -273,11 +273,12 @@ public class JoinIOHandler implements AutoCloseable {
     }
 
     /** The reader must be closed by the caller. */
-    private IterableIonReader createInputReader(URI inputUri) throws TransformException {
+    private IterableIonReader createInputReader(JoinSide side) throws TransformException {
+        var inputUri = storageUri(side);
         InputStream inputStream = null;
         try {
             inputStream = runContext.storage().getFile(inputUri);
-            return new IterableIonReader(inputStream);
+            return new IterableIonReader(inputStream, side.toString());
         } catch (IOException | RuntimeException e) {
             if (inputStream != null) {
                 try {
@@ -298,7 +299,7 @@ public class JoinIOHandler implements AutoCloseable {
             count = inputRecords.size();
         } else {
             var inputUri = storageUri(side);
-            try (var reader = createInputReader(inputUri)) {
+            try (var reader = createInputReader(side)) {
                 for (var ignored : reader) {
                     count++;
                 }
