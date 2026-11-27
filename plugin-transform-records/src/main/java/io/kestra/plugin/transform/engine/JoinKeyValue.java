@@ -59,7 +59,7 @@ public final class JoinKeyValue implements Comparable<JoinKeyValue> {
     @SuppressWarnings("unchecked")
     public int compareTo(JoinKeyValue other) {
         if (type != other.type) {
-            throw new IllegalStateException(String.format(JoinMessages.DIFFERENT_TYPES, this, other));
+            throw new IllegalStateException(String.format(JoinMessages.DIFFERENT_TYPES, type, other.type));
         }
         return ((Comparable<Object>) value).compareTo(other.value);
     }

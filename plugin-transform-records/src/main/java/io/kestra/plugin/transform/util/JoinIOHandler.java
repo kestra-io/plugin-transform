@@ -144,9 +144,7 @@ public class JoinIOHandler implements AutoCloseable {
         try {
             write(buildRow(leftRow, rightRow));
         } catch (IOException | RuntimeException e) {
-            throw new TransformException(String.format(JoinMessages.WRITE_ERROR,
-                String.format("a merged row between %s and %s", leftRow, rightRow)
-            ), e);
+            throw new TransformException(String.format(JoinMessages.WRITE_ERROR, "a merged row"), e);
         }
     }
 
@@ -154,9 +152,7 @@ public class JoinIOHandler implements AutoCloseable {
         try {
             write(side == JoinSide.LEFT ? buildRow(row, null) : buildRow(null, row));
         } catch (IOException | RuntimeException e) {
-            throw new TransformException(String.format(JoinMessages.WRITE_ERROR,
-                String.format("%s from %s side", row, side)
-            ), e);
+            throw new TransformException(String.format(JoinMessages.WRITE_ERROR, "a row from the " + side + " input"), e);
         }
     }
 

@@ -1249,7 +1249,8 @@ class JoinTest {
                 "BOTH", new String[] { leftContent, rightContent }
             );
 
-        String expectedErrorPattern = String.format(JoinMessages.MISSING_KEY, "id", "(LEFT|RIGHT|BOTH)", ".*");
+        // The whole message must match: it gives the row number, never the row contents.
+        String expectedErrorPattern = String.format(JoinMessages.MISSING_KEY.replace("%d", "\\d+"), "id", "(LEFT|RIGHT)");
 
         for (var testEntry : contentsBySide.entrySet()) {
             RunContext runContext = getRunContext(testEntry.getValue()[0], testEntry.getValue()[1]);
@@ -1338,7 +1339,8 @@ class JoinTest {
                 "RIGHT", new String[] { defaultLeftContent, rightContent }
             );
 
-        String expectedErrorPattern = JoinMessages.DIFFERENT_TYPES.replaceAll("%s", ".*");
+        // In both cases, the first key read is an INT of the left input.
+        String expectedError = String.format(JoinMessages.DIFFERENT_TYPES, "INT", "BOOL");
 
         for (var testEntry : contentsBySide.entrySet()) {
             RunContext runContext = getRunContext(testEntry.getValue()[0], testEntry.getValue()[1]);
@@ -1352,7 +1354,7 @@ class JoinTest {
                             () -> getOutput(runContext, joinImplementation, joinType));
 
                         assertThat("Should show specific error" + testCase,
-                            exception.getMessage(), matchesPattern(expectedErrorPattern));
+                            exception.getMessage(), equalTo(expectedError));
                     } else {
                         assertDoesNotThrow(
                             () -> getOutput(runContext, joinImplementation, joinType),
@@ -1379,7 +1381,7 @@ class JoinTest {
             {id:5.1,rightValue:"R5-A"}
             {id:5.0,rightValue:"R5-B"}""";
 
-        String expectedErrorPattern = JoinMessages.DIFFERENT_TYPES.replaceAll("%s", ".*");
+        String expectedError = String.format(JoinMessages.DIFFERENT_TYPES, "INT", "DECIMAL");
 
         RunContext runContext = getRunContext(defaultLeftContent, rightContent);
 
@@ -1390,7 +1392,7 @@ class JoinTest {
                         () -> getOutput(runContext, joinImplementation, joinType));
 
                     assertThat("Should show specific error" + describe(joinImplementation, joinType),
-                        exception.getMessage(), matchesPattern(expectedErrorPattern));
+                        exception.getMessage(), equalTo(expectedError));
                 } else {
                     assertDoesNotThrow(
                         () -> getOutput(runContext, joinImplementation, joinType),
@@ -1451,7 +1453,8 @@ class JoinTest {
         String expected = """
             {customer:{id:1},leftValue:"L1",rightValue:"R1"}""";
 
-        String expectedErrorPattern = String.format(JoinMessages.MISSING_KEY, nestedKey, "LEFT", ".*");
+        // The first missing key is at the second row of the left input.
+        String expectedError = String.format(JoinMessages.MISSING_KEY, nestedKey, "LEFT", 2);
 
         Map<MissingKeyAction, Optional<State.Type>> expectedStates =
             Map.of(
@@ -1466,7 +1469,7 @@ class JoinTest {
                 () -> getOutput(runContext, joinImplementation, JoinType.INNER, nestedKey, nestedKey, MissingKeyAction.FAIL));
 
             assertThat("Missing parent should fail as a missing key with FAIL" + describe(joinImplementation, JoinType.INNER),
-                exception.getMessage(), matchesPattern(expectedErrorPattern));
+                exception.getMessage(), equalTo(expectedError));
 
             for (var testEntry : expectedStates.entrySet()) {
                 Join.Output runOutput = getOutput(runContext, joinImplementation, JoinType.INNER, nestedKey, nestedKey, testEntry.getKey());

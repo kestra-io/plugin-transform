@@ -109,7 +109,7 @@ public class SortedMergeJoin extends AbstractJoinImplementation {
                 if (reference == null) {
                     reference = key;
                 } else if (reference.getType() != key.getType()) {
-                    throw new TransformException(String.format(JoinMessages.DIFFERENT_TYPES, reference, key));
+                    throw new TransformException(String.format(JoinMessages.DIFFERENT_TYPES, reference.getType(), key.getType()));
                 }
             }
         }

@@ -36,6 +36,9 @@ public final class JoinKey {
     // True once a missing key has been reported, so that the warning is logged only once.
     private boolean isMissing = false;
 
+    // Every implementation extracts the key of each row once, in input order: this is the row number in the input.
+    private long rowNumber = 0;
+
     public JoinKey(String keyString,
         JoinSide keySide,
         MissingKeyAction onMissingKey,
@@ -55,6 +58,7 @@ public final class JoinKey {
 
     /** Returns null when the key is missing and the missing key action does not fail. */
     public JoinKeyValue extractKeyValue(IonStruct row) throws TransformException {
+        rowNumber++;
         var value = traverseRow(row, 0);
         return IonValueUtils.isNull(value) ? null : JoinKeyValue.of(value);
     }
@@ -73,7 +77,7 @@ public final class JoinKey {
         if (depth < keyPath.size() - 1) {
             // An absent or null parent object makes the key missing; only a non-object parent is an error.
             if (IonValueUtils.isNull(val)) {
-                handleMissingKey(row);
+                handleMissingKey();
                 return null;
             }
             if (val.getType() == IonType.STRUCT) {
@@ -82,7 +86,7 @@ public final class JoinKey {
             throw new TransformException(String.format(JoinMessages.UNREACHABLE_KEY_DEPTH, keyString, keySide));
         }
         if (IonValueUtils.isNull(val)) {
-            handleMissingKey(row);
+            handleMissingKey();
             return val;
         }
         if (val.getType() == IonType.STRUCT) {
@@ -94,8 +98,8 @@ public final class JoinKey {
         return val;
     }
 
-    private void handleMissingKey(IonStruct row) throws TransformException {
-        var message = String.format(JoinMessages.MISSING_KEY, keyString, keySide, row);
+    private void handleMissingKey() throws TransformException {
+        var message = String.format(JoinMessages.MISSING_KEY, keyString, keySide, rowNumber);
         switch (onMissingKey) {
             case FAIL -> throw new TransformException(message);
             case WARNING -> {
