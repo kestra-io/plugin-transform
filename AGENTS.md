@@ -57,7 +57,7 @@ This is a **multi-module** plugin with 4 submodules:
 Join-specific rules:
 
 - Keep the `leftSize`, `rightSize` and `outputSize` outputs; metrics may only be added on top of them.
-- `leftLabel`, `rightLabel` and `prefixSeparator` are intentionally static, so that labels are validated when the flow is saved.
+- `leftLabel`, `rightLabel` and `prefixSeparator` are dynamic properties; labels are checked (not blank, distinct) at run time, and the separator may be empty.
 - Join keys are split on `.`, not evaluated with the shared expression language.
 - `HASH` must keep streaming the larger input; only the smaller one is held in memory.
 

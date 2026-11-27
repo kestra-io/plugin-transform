@@ -43,7 +43,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.matchesPattern;
@@ -256,8 +255,8 @@ class JoinTest {
         Join task = taskBuilder(leftKey, rightKey)
             .joinImplementation(Property.ofValue(joinImplementation))
             .joinType(Property.ofValue(joinType))
-            .leftLabel(leftLabel)
-            .rightLabel(rightLabel)
+            .leftLabel(Property.ofValue(leftLabel))
+            .rightLabel(Property.ofValue(rightLabel))
             .mergeMode(Property.ofValue(mergeMode))
             .build();
         return task.run(runContext);
@@ -597,6 +596,9 @@ class JoinTest {
             .onMissingKey(null)
             .outputFormat(null)
             .outputType(null)
+            .leftLabel(null)
+            .rightLabel(null)
+            .prefixSeparator(null)
             .build();
 
         Join.Output runOutput = task.run(runContext);
@@ -604,6 +606,55 @@ class JoinTest {
         assertThat("Inputs from storage should give a stored output by default", runOutput.getUri(), notNullValue());
         assertThat("Result should be the one of the default join type and merge mode",
             sortIonLines(readOutput(runOutput)), equalTo(sortIonLines(defaultExpectedResults.get(JoinType.INNER))));
+    }
+
+    /**
+     * Tests that left and right labels rendering to the same value make the task fail.
+     */
+    @Test
+    void identicalLabelsAreRejected() {
+
+        RunContext runContext = getRunContext(defaultLeftContent, defaultRightContent);
+
+        Exception exception = assertThrows(Exception.class, () -> getOutputWithLabels(runContext,
+            JoinImplementation.HASH,
+            JoinType.INNER,
+            "same",
+            "same",
+            MergeMode.NEST));
+
+        assertThat("Identical labels should be rejected", exception.getMessage(), equalTo(JoinMessages.SAME_LABELS));
+    }
+
+    /**
+     * Tests that a label rendering to an empty or blank string makes the task fail with an error naming the property.
+     */
+    @Test
+    void blankLabelIsRejected() {
+
+        RunContext runContext = getRunContext(defaultLeftContent, defaultRightContent);
+
+        for (String blankValue : new String[] { "", "   " }) {
+            Map<String, String[]> labelsByProperty =
+                Map.of(
+                    "leftLabel", new String[] { blankValue, "right" },
+                    "rightLabel", new String[] { "left", blankValue }
+                );
+
+            for (var testEntry : labelsByProperty.entrySet()) {
+                String expectedError = String.format(JoinMessages.BLANK_PROPERTY, testEntry.getKey());
+
+                Exception exception = assertThrows(Exception.class, () -> getOutputWithLabels(runContext,
+                    JoinImplementation.HASH,
+                    JoinType.INNER,
+                    testEntry.getValue()[0],
+                    testEntry.getValue()[1],
+                    MergeMode.NEST));
+
+                assertThat("Should show error for blank value [" + blankValue + "] on " + testEntry.getKey(),
+                    exception.getMessage(), equalTo(expectedError));
+            }
+        }
     }
 
     /**
@@ -991,6 +1042,70 @@ class JoinTest {
     }
 
     /**
+     * Tests that labels are rendered from expressions.
+     */
+    @Test
+    void labelsAreRendered() throws Exception {
+
+        String leftContent = """
+            {id:1,value:"L1"}""";
+
+        String rightContent = """
+            {id:1,value:"R1"}""";
+
+        String expected = """
+            {customer:{id:1,value:"L1"},order:{id:1,value:"R1"}}""";
+
+        RunContext runContext = this.runContextFactory.of(Map.of(
+            "left", storeContent(leftContent).toString(),
+            "right", storeContent(rightContent).toString(),
+            "leftLabel", "customer",
+            "rightLabel", "order"
+        ));
+
+        Join task = taskBuilder(defaultKey, defaultKey)
+            .mergeMode(Property.ofValue(MergeMode.NEST))
+            .leftLabel(Property.ofExpression("{{ leftLabel }}"))
+            .rightLabel(Property.ofExpression("{{ rightLabel }}"))
+            .build();
+
+        assertThat("Fields should be nested under the rendered labels",
+            sortIonLines(readOutput(task.run(runContext))), equalTo(expected));
+    }
+
+    /**
+     * Tests that a prefix separator rendering to an empty string is kept, instead of being replaced by the default one.
+     */
+    @Test
+    void emptyPrefixSeparatorIsKept() throws Exception {
+
+        String leftContent = """
+            {id:1,value:"L1"}""";
+
+        String rightContent = """
+            {id:1,value:"R1"}""";
+
+        String expected = """
+            {Lid:1,Lvalue:"L1",Rid:1,Rvalue:"R1"}""";
+
+        RunContext runContext = this.runContextFactory.of(Map.of(
+            "left", storeContent(leftContent).toString(),
+            "right", storeContent(rightContent).toString(),
+            "separator", ""
+        ));
+
+        Join task = taskBuilder(defaultKey, defaultKey)
+            .mergeMode(Property.ofValue(MergeMode.PREFIX))
+            .leftLabel(Property.ofValue("L"))
+            .rightLabel(Property.ofValue("R"))
+            .prefixSeparator(Property.ofExpression("{{ separator }}"))
+            .build();
+
+        assertThat("Fields should be prefixed without separator",
+            sortIonLines(readOutput(task.run(runContext))), equalTo(expected));
+    }
+
+    /**
      * Test of the 'onlyFirstMatchOnSemi' option property as true.
      * This should prevent duplicate lines in result with semi joins.
      */
@@ -1176,45 +1291,13 @@ class JoinTest {
     */
 
     /**
-     * Tests that the base task used by validation tests is valid,
-     * so that violations found by other validation tests come from the property they change.
+     * Tests that a task with only the required properties passes the validation done by Kestra when a flow is saved.
      */
     @Test
     void validTaskHasNoViolation() {
         Join task = taskBuilder(defaultKey, defaultKey).build();
 
         assertThat("Task should be valid", modelValidator.isValid(task).isEmpty(), is(true));
-    }
-
-    /**
-     * Tests that identical left and right labels are rejected.
-     */
-    @Test
-    void identicalLabelsAreRejected() {
-        Join task = taskBuilder(defaultKey, defaultKey)
-            .leftLabel("same")
-            .rightLabel("same")
-            .build();
-
-        var violation = modelValidator.isValid(task);
-
-        assertThat("Identical labels should be rejected", violation.isPresent(), is(true));
-        assertThat(violation.get().getMessage(), containsString("leftLabel and rightLabel must be different"));
-    }
-
-    /**
-     * Tests that a blank label is rejected.
-     */
-    @Test
-    void blankLabelIsRejected() {
-        Join task = taskBuilder(defaultKey, defaultKey)
-            .leftLabel("   ")
-            .build();
-
-        var violation = modelValidator.isValid(task);
-
-        assertThat("Blank label should be rejected", violation.isPresent(), is(true));
-        assertThat(violation.get().getMessage(), containsString("leftLabel"));
     }
 
     /*

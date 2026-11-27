@@ -23,8 +23,6 @@ import io.kestra.plugin.transform.util.OutputFormat;
 import io.kestra.plugin.transform.util.TransformException;
 import io.kestra.plugin.transform.util.TransformTaskSupport;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -160,6 +158,9 @@ public class Join extends Task implements RunnableTask<Join.Output> {
     private static final JoinImplementation DEFAULT_JOIN_IMPLEMENTATION = JoinImplementation.HASH;
     private static final JoinType DEFAULT_JOIN_TYPE = JoinType.INNER;
     private static final MergeMode DEFAULT_MERGE_MODE = MergeMode.OVERWRITE;
+    private static final String DEFAULT_LEFT_LABEL = "left";
+    private static final String DEFAULT_RIGHT_LABEL = "right";
+    private static final String DEFAULT_PREFIX_SEPARATOR = "_";
     private static final boolean DEFAULT_ONLY_FIRST_MATCH_ON_SEMI = false;
     private static final MissingKeyAction DEFAULT_ON_MISSING_KEY = MissingKeyAction.FAIL;
     private static final OutputFormat DEFAULT_OUTPUT_FORMAT = OutputFormat.TEXT;
@@ -235,29 +236,27 @@ public class Join extends Task implements RunnableTask<Join.Output> {
 
     @Schema(
         title = "Label for left fields in output",
-        description = "Depending on merge mode, used as prefix in combination with prefixSeparator, or object key for left fields. Must differ from rightLabel."
+        description = "Depending on merge mode, used as prefix in combination with prefixSeparator, or object key for left fields. Must not be blank, and must differ from rightLabel."
     )
     @PluginProperty(group = "destination")
-    @NotBlank
     @Builder.Default
-    private String leftLabel = "left";
+    private Property<String> leftLabel = Property.ofValue(DEFAULT_LEFT_LABEL);
 
     @Schema(
         title = "Label for right fields in output",
-        description = "Depending on merge mode, used as prefix in combination with prefixSeparator, or object key for right fields. Must differ from leftLabel."
+        description = "Depending on merge mode, used as prefix in combination with prefixSeparator, or object key for right fields. Must not be blank, and must differ from leftLabel."
     )
     @PluginProperty(group = "destination")
-    @NotBlank
     @Builder.Default
-    private String rightLabel = "right";
+    private Property<String> rightLabel = Property.ofValue(DEFAULT_RIGHT_LABEL);
 
     @Schema(
         title = "Separator character for prefixes",
-        description = "When merge mode is prefix, will be concatenated between label and field names. Can be blank."
+        description = "When merge mode is prefix, will be concatenated between label and field names. Can be empty."
     )
     @PluginProperty(group = "destination")
     @Builder.Default
-    private String prefixSeparator = "_";
+    private Property<String> prefixSeparator = Property.ofValue(DEFAULT_PREFIX_SEPARATOR);
 
     @Schema(
         title = "Keep only the first match in the output on semi joins",
@@ -298,14 +297,6 @@ public class Join extends Task implements RunnableTask<Join.Output> {
     @Builder.Default
     private Property<OutputMode> outputType = Property.ofValue(DEFAULT_OUTPUT_TYPE);
 
-    @Schema(hidden = true)
-    @JsonIgnore
-    @AssertTrue(message = "leftLabel and rightLabel must be different")
-    public boolean isLabelsDistinct() {
-        // A missing label is reported by @NotBlank, not here.
-        return leftLabel == null || rightLabel == null || !leftLabel.equals(rightLabel);
-    }
-
     @Override
     public Join.Output run(RunContext runContext) throws Exception {
         var rLeftKey = renderNonBlank(leftKey, "leftKey", runContext);
@@ -316,6 +307,12 @@ public class Join extends Task implements RunnableTask<Join.Output> {
             .orElse(DEFAULT_JOIN_TYPE);
         var rMergeMode = render(mergeMode, MergeMode.class, "mergeMode", runContext)
             .orElse(DEFAULT_MERGE_MODE);
+        var rLeftLabel = render(leftLabel, String.class, "leftLabel", runContext)
+            .orElse(DEFAULT_LEFT_LABEL);
+        var rRightLabel = render(rightLabel, String.class, "rightLabel", runContext)
+            .orElse(DEFAULT_RIGHT_LABEL);
+        var rPrefixSeparator = render(prefixSeparator, String.class, "prefixSeparator", runContext)
+            .orElse(DEFAULT_PREFIX_SEPARATOR);
         var rOnlyFirstMatchOnSemi = render(onlyFirstMatchOnSemi, Boolean.class, "onlyFirstMatchOnSemi", runContext)
             .orElse(DEFAULT_ONLY_FIRST_MATCH_ON_SEMI);
         var rOnMissingKey = render(onMissingKey, MissingKeyAction.class, "onMissingKey", runContext)
@@ -324,6 +321,8 @@ public class Join extends Task implements RunnableTask<Join.Output> {
             .orElse(DEFAULT_OUTPUT_FORMAT);
         var rOutputType = render(outputType, OutputMode.class, "outputType", runContext)
             .orElse(DEFAULT_OUTPUT_TYPE);
+
+        checkLabels(rLeftLabel, rRightLabel);
 
         var rLeft = resolveInput(left, "left", runContext);
         var rRight = resolveInput(right, "right", runContext);
@@ -338,9 +337,9 @@ public class Join extends Task implements RunnableTask<Join.Output> {
             storeOutput,
             rOutputFormat,
             rMergeMode,
-            leftLabel,
-            rightLabel,
-            prefixSeparator
+            rLeftLabel,
+            rRightLabel,
+            rPrefixSeparator
         )) {
 
             var leftJoinKey = new JoinKey(rLeftKey, JoinSide.LEFT, rOnMissingKey, ioHandler);
@@ -390,6 +389,18 @@ public class Join extends Task implements RunnableTask<Join.Output> {
         return render(property, String.class, propertyName, runContext)
             .filter(value -> !value.isBlank())
             .orElseThrow(() -> new TransformException(String.format(JoinMessages.BLANK_PROPERTY, propertyName)));
+    }
+
+    private void checkLabels(String rLeftLabel, String rRightLabel) throws TransformException {
+        if (rLeftLabel.isBlank()) {
+            throw new TransformException(String.format(JoinMessages.BLANK_PROPERTY, "leftLabel"));
+        }
+        if (rRightLabel.isBlank()) {
+            throw new TransformException(String.format(JoinMessages.BLANK_PROPERTY, "rightLabel"));
+        }
+        if (rLeftLabel.equals(rRightLabel)) {
+            throw new TransformException(JoinMessages.SAME_LABELS);
+        }
     }
 
     private TransformTaskSupport.ResolvedInput resolveInput(

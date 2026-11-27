@@ -6,6 +6,7 @@ public final class JoinMessages {
 
     public static final String RENDER_ERROR = "An exception occurred while trying to render '%s' property.";
     public static final String BLANK_PROPERTY = "The '%s' property rendered to a blank value.";
+    public static final String SAME_LABELS = "The 'leftLabel' and 'rightLabel' properties must render to different values.";
     public static final String READ_ERROR = "An exception occurred while trying to read '%s' input.";
     public static final String EMPTY_INPUT = "The %s input is empty.";
     public static final String MISSING_KEY = "The key field '%s' is missing in the %s input at row %d.";

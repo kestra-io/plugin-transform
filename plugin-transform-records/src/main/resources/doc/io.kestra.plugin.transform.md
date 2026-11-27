@@ -186,7 +186,7 @@ For example, with common `name` field and `leftLabel = "left"` and `rightLabel =
 ...
 ```
 
-`leftLabel` and `rightLabel` are static values, checked when the flow is saved: they must not be blank and must differ.
+`leftLabel`, `rightLabel` and `prefixSeparator` accept expressions. Labels are checked when the task runs: they must not be blank and must differ. The separator can be empty.
 
 ### Accepted key types
 
