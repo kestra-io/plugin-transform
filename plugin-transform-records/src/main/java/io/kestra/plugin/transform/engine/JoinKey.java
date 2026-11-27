@@ -52,10 +52,6 @@ public final class JoinKey {
         this.keyPath = Arrays.stream(keyString.split("\\.")).map(String::trim).toList();
     }
 
-    public String getKeyString() {
-        return keyString;
-    }
-
     /** Returns null when the key is missing and the missing key action does not fail. */
     public JoinKeyValue extractKeyValue(IonStruct row) throws TransformException {
         rowNumber++;

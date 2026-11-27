@@ -53,7 +53,6 @@ public class JoinIOHandler implements AutoCloseable {
 
     private OutputStream outputStream;
     private IonWriter ionWriter;
-    private URI outputUri;
     private long outputSize = 0;
 
     // Null for the default state.
@@ -198,8 +197,7 @@ public class JoinIOHandler implements AutoCloseable {
         }
         try {
             closeWriter();
-            outputUri = runContext.storage().putFile(outputFile.toFile(), "join-" + UUID.randomUUID() + ".ion");
-            return outputUri;
+            return runContext.storage().putFile(outputFile.toFile(), "join-" + UUID.randomUUID() + ".ion");
         } catch (IOException e) {
             throw new TransformException(JoinMessages.STORAGE_ERROR, e);
         }

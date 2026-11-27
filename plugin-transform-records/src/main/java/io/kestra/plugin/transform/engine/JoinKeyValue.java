@@ -35,7 +35,7 @@ public final class JoinKeyValue implements Comparable<JoinKeyValue> {
             case DECIMAL -> ((IonDecimal) ionValue).decimalValue().stripTrailingZeros();
             case STRING -> ((IonString) ionValue).stringValue();
             case TIMESTAMP -> ((IonTimestamp) ionValue).timestampValue().getDecimalMillis().stripTrailingZeros();
-            default -> throw new IllegalArgumentException(JoinMessages.UNPROCESSABLE_COMPARED_TYPES);
+            default -> throw new IllegalArgumentException("Unprocessable key type: " + ionValue.getType());
         };
         return new JoinKeyValue(ionValue.getType(), normalized);
     }
